@@ -7,19 +7,40 @@ class FastPaginate {
             return;
         }
         this.current_page = 1;
+        this.load_page = 1;
         this.show = 0;
         this.total = config.total;
         this.last_key = config.last_key;
         this.items = this.wrapper.querySelector('.fp-items');
         this.btnMore = this.wrapper.querySelector('.fp-more');
+        this.pagination = this.wrapper.querySelector('.fp-pagination');
 
         this.addEventListeners();
     }
 
     addEventListeners() {
         this.btnMore?.addEventListener('click', async ({ target }) => {
+            ++this.load_page;
+
             const response = await this.fetch('loadmore');
             await this.response(response);
+        });
+
+        this.pagination?.addEventListener('click', async (event) => {
+            const target = event.target.closest('.pagination-link');
+
+            if (target) {
+                event.preventDefault();
+                event.stopPropagation();
+
+                const page = target.getAttribute('data-page') || target.textContent;
+                this.load_page = parseInt(page,10);
+
+                const response = await this.fetch('paginate');
+                await this.response(response);
+
+                return false;
+            }
         });
     }
 
@@ -29,6 +50,7 @@ class FastPaginate {
         data.append('key', this.key);
         data.append('total', this.total);
         data.append('current_page', this.current_page);
+        data.append('load_page', this.load_page);
         data.append('last_key', this.last_key);
         for (let key in fields) {
             if (fields.hasOwnProperty(key)) {
@@ -50,13 +72,30 @@ class FastPaginate {
     }
 
     async response(response) {
+        console.log(response);
         switch (response?.action) {
             case 'loadmore':
                 this.items.insertAdjacentHTML('beforeend', response.output);
-                this.current_page = response.current_page;
-                this.last_key = response.last_key;
-                this.show = response.show;
+                this.updatePagination(response);
                 break;
+
+            case 'paginate':
+                this.items.innerHTML = response.output;
+                this.updatePagination(response);
+                break;
+        }
+    }
+
+    updatePagination(response) {
+        this.current_page = response.current_page;
+        this.last_key = response.last_key;
+        this.show = response.show;
+
+        if (this.pagination && response?.tplPagination !== '') {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = response.tplPagination;
+            const paginationContent = tempDiv.querySelector('.fp-pagination').innerHTML;
+            this.pagination.innerHTML = paginationContent;
         }
     }
 }

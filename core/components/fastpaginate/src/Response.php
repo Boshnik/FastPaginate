@@ -12,6 +12,7 @@ class Response
     private string $sortby = 'id';
     private string $sortdir = 'ASC';
     private bool $paginate = false;
+    private string $tplPagination = '';
     private array $errors = [];
     public function __construct(public array $data = []) {}
 
@@ -55,6 +56,10 @@ class Response
                     ? ceil($this->total / $this->limit)
                     : 0,
             ]);
+
+            if (!empty($this->tplPagination)) {
+                $response['tplPagination'] = $this->tplPagination;
+            }
         }
 
         $response['output'] = $output ?: $this->data;

@@ -8,6 +8,7 @@ class FastPaginate
     public array $config = [];
     public Crypt $crypt;
     public Response $response;
+    public Parser $parser;
 
     public string $table;
     public array $data = [];
@@ -17,7 +18,7 @@ class FastPaginate
      * @param modX $modx
      * @param array $config
      */
-    function __construct(public modX $modx, public array $properties = [])
+    function __construct(public \modX $modx, public array $properties = [])
     {
         $assetsUrl = MODX_ASSETS_URL . "components/{$this->namespace}/";
         $corePath = MODX_CORE_PATH . "components/{$this->namespace}/";
@@ -26,7 +27,6 @@ class FastPaginate
             'assetsUrl' => $assetsUrl,
             'actionUrl' => $assetsUrl . 'action.php',
             'modelPath' => $corePath . 'model/',
-            'contextKey' => $this->modx->context->key ?? 'mgr',
         ];
 
         $this->properties = array_merge([
@@ -39,10 +39,15 @@ class FastPaginate
             'sortdir' => 'ASC',
             'outputSeparator' => "\n",
             'tpl' => '',
+            'tpl.pagination' => 'fp.pagination',
+            'tpl.pagination.direction' => 'fp.pagination.direction',
+            'tpl.pagination.link' => 'fp.pagination.link',
+            'pls.pagination' => 'pls.pagination',
         ], array_filter($this->properties));
 
         $this->crypt = new Crypt($this->modx->uuid);
         $this->response = new Response();
+        $this->parser = new Parser($this->modx, $this->properties);
 
         $this->modx->addPackage($this->namespace, $this->config['modelPath']);
         $this->modx->lexicon->load("$this->namespace:default");
@@ -208,13 +213,7 @@ class FastPaginate
 
     public function chunk($tpl): array
     {
-        $output = [];
-        foreach ($this->data as $item) {
-            $output[] = $this->modx->getChunk($tpl, $item);
-        }
-        $output = implode($this->properties['outputSeparator'], $output);
-
-        return $this->response->success('', $output);
+        return $this->response->success('', $this->parser->items($tpl, $this->data));
     }
 
     public function loadScripts(): void
@@ -238,6 +237,14 @@ class FastPaginate
             'key' => $key,
         ]);
 
+        // Pagination
+        if ($this->properties['paginate'] ?? false) {
+            $this->modx->setPlaceholder(
+                $this->properties['pls.pagination'],
+                $this->getPagination()
+            );
+        }
+
         $this->modx->regClientScript("<script>
             document.addEventListener('DOMContentLoaded', () => {
                 new FastPaginate({$config});
@@ -245,15 +252,41 @@ class FastPaginate
         </script>", true);
     }
 
-    public function handleRequest(string $action, array $request = []): array
+    public function getPagination(): string
     {
-        return match ($action) {
-            'loadmore' => $this->loadMore($request),
-            default => $this->response->failure('Action not allowed'),
-        };
+        $currentPage = $this->response->current_page ?? 1;
+        $totalPages = $this->response->total
+            ? ceil($this->response->total / $this->properties['limit'])
+            : 0;
+
+        $pagination = new Pagination($currentPage, $totalPages);
+
+        $prev = $this->parser->item(
+            $this->properties['tpl.pagination.direction'],
+            $pagination->prev()
+        );
+
+        $next = $this->parser->item(
+            $this->properties['tpl.pagination.direction'],
+            $pagination->next()
+        );
+
+        $links = $this->parser->items(
+            $this->properties['tpl.pagination.link'],
+            $pagination->links()
+        );
+
+        return $this->parser->item(
+            $this->properties['tpl.pagination'],
+            [
+                'prev' => $prev,
+                'next' => $next,
+                'links' => $links,
+            ]
+        );
     }
 
-    public function loadMore($request): array
+    public function handleRequest(string $action, array $request = []): array
     {
         $this->properties = array_merge(
             $this->crypt->decrypt($request['key']),
@@ -261,13 +294,28 @@ class FastPaginate
                 'last_key' => $request['last_key'] ?? ''
             ]
         );
+        $this->response->action = $action;
+        $this->response->current_page = $request['load_page'] ?? 1;
 
-        $this->response->action = 'loadmore';
-        $this->response->current_page = ($request['current_page'] ?? 1) + 1;
-        if (!empty($request['total'] ?? '')) {
-            $this->response->total = $request['total'];
+        if (in_array($action, ['loadmore', 'paginate'])) {
+            if (!empty($request['total'] ?? '')) {
+                $this->response->total = $request['total'];
+            }
+
+            if ($this->properties['paginate'] ?? false) {
+                $this->response->tplPagination = $this->getPagination();
+            }
         }
 
+        return match ($action) {
+            'loadmore' => $this->loadMore($request),
+            'paginate' => $this->loadPage($request),
+            default => $this->response->failure('Action not allowed'),
+        };
+    }
+
+    public function loadMore($request): array
+    {
         if (empty($this->properties['last_key'])) {
             $this->properties['offset'] += $this->properties['limit'];
         } else {
@@ -277,6 +325,18 @@ class FastPaginate
         $this->response->offset = $this->properties['offset'];
 
         return $this->next();
+    }
+
+    public function loadPage($request): array
+    {
+        $step = $request['load_page'] - $request['current_page'];
+        if ($step === 1) {
+            return $this->loadMore($request);
+        }
+
+        $this->properties['offset'] = ($request['load_page'] - 1) * $this->properties['limit'];
+
+        return $this->filters($this->properties['where'])->paginate()->output();
     }
 
 }
