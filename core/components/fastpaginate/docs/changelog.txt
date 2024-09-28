@@ -1,0 +1,5 @@
+# Changelog
+
+## [1.0.0-pl] - 2024-10-01
+
+- First release

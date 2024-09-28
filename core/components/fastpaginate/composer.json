@@ -1,0 +1,25 @@
+{
+  "name": "boshnik/fastpaginate",
+  "description": "FastPaginate",
+  "authors": [
+    {
+      "name": "Aleksandr Huz",
+      "email": "Superboshnik@gmail.com",
+      "homepage": "https://github.com/Boshnik"
+    }
+  ],
+  "license": "GPL-2.0-or-later",
+  "require": {
+    "php": ">=8.1.0"
+  },
+  "config": {
+    "platform": {
+      "php": "8.1.0"
+    }
+  },
+  "autoload": {
+    "psr-4": {
+      "Boshnik\\FastPaginate\\": "src/"
+    }
+  }
+}
