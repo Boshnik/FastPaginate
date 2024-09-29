@@ -6,11 +6,11 @@ class FastPaginate
 {
     public string $namespace = 'fastpaginate';
     public array $config = [];
+    public Query $query;
     public Crypt $crypt;
     public Response $response;
     public Parser $parser;
 
-    public string $table;
     public array $data = [];
 
 
@@ -27,6 +27,7 @@ class FastPaginate
             'assetsUrl' => $assetsUrl,
             'actionUrl' => $assetsUrl . 'action.php',
             'modelPath' => $corePath . 'model/',
+            'siteUrl' => MODX_SITE_URL,
         ];
 
         $this->properties = array_merge([
@@ -47,6 +48,7 @@ class FastPaginate
             'pls.pagination' => 'pls.pagination',
         ], $this->properties);
 
+        $this->query = new Query($this->modx, $this->properties);
         $this->crypt = new Crypt($this->modx->uuid);
         $this->response = new Response();
         $this->parser = new Parser($this->modx, $this->properties);
@@ -61,7 +63,7 @@ class FastPaginate
         $this->modx->lexicon->load("$this->namespace:default");
     }
 
-    public function getPageNumber()
+    public function getPageNumber(): int
     {
         if (empty($this->properties['path'])) {
             return 1;
@@ -82,17 +84,12 @@ class FastPaginate
     {
         $uri = ltrim($_SERVER['REQUEST_URI'], '/');
 
-        return MODX_SITE_URL . $uri;
+        return $this->config['siteUrl'] . $uri;
     }
-
-
 
     public function filters(array $where = []): static
     {
-        $className = $this->properties['className'];
-        $this->table = $this->modx->getTableName($className) ?? $className;
-        $whereSQL = $this->createWhere($where);
-        $this->data = $this->getData($whereSQL);
+        $this->data = $this->query->getData($where);
         $this->response->data = $this->data;
 
         return $this;
@@ -100,10 +97,7 @@ class FastPaginate
 
     public function paginate(): static
     {
-        if ($this->response->total === 0) {
-            $whereSQL = $this->createWhere($this->properties['where']);
-            $this->response->total = $this->getTotal($whereSQL);
-        }
+        $this->response->total = $this->response->total ?: $this->query->getTotal($this->properties['where']);
         $this->response->limit = $this->properties['limit'];
         $this->response->sortby = $this->properties['sortby'];
         $this->response->sortdir = $this->properties['sortdir'];
@@ -126,108 +120,6 @@ class FastPaginate
         }
 
         return $this->filters($where)->paginate()->output();
-    }
-
-    public function getData(string $where = '')
-    {
-        $subquery = $this->getSubQuery($where);
-        $sortby = $this->properties['sortby'];
-        $sortdir = $this->properties['sortdir'];
-
-        $sql = "
-            SELECT main.*
-            FROM {$this->table} AS main
-            JOIN (
-                $subquery
-            ) AS subquery ON main.id = subquery.id
-            ORDER BY `$sortby` $sortdir
-        ";
-        $stmt = $this->modx->prepare($sql);
-        $stmt->execute();
-
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
-    }
-
-    public function getSubQuery(string $where = ''): string
-    {
-        $limit = $this->properties['limit'];
-        $offset = $this->properties['offset'];
-
-        return "SELECT `id` FROM {$this->table} {$where} LIMIT $limit OFFSET $offset";
-    }
-
-    public function getTotal(string $where = ''): int
-    {
-        $sql = "SELECT COUNT(*) AS total_records FROM {$this->table} {$where}";
-        $stmt = $this->modx->query($sql);
-        if ($stmt) {
-            $result = $stmt->fetch(\PDO::FETCH_ASSOC);
-            return (int) ($result['total_records'] ?? 0);
-        }
-
-        return 0;
-    }
-
-    public function createWhere(array $filters = []): string
-    {
-        if (is_string($filters)) {
-            $filters = json_decode($filters, true);
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                $this->modx->log(1, 'Error when decoding filters.');
-                return '';
-            }
-        }
-
-        $where = [];
-        foreach ($filters as $field => $value) {
-            if (strpos($field, ':') !== false) {
-                list($fieldName, $operator) = explode(':', $field, 2);
-                switch ($operator) {
-                    case '>':
-                        $where[] = "`$fieldName` > " . $this->modx->quote($value);
-                        break;
-                    case '<':
-                        $where[] = "`$fieldName` < " . $this->modx->quote($value);
-                        break;
-                    case '>=':
-                        $where[] = "`$fieldName` >= " . $this->modx->quote($value);
-                        break;
-                    case '<=':
-                        $where[] = "`$fieldName` <= " . $this->modx->quote($value);
-                        break;
-                    case '!=':
-                        $where[] = "`$fieldName` != " . $this->modx->quote($value);
-                        break;
-                    case '=':
-                        $where[] = "`$fieldName` = " . $this->modx->quote($value);
-                        break;
-                    case 'LIKE':
-                        $where[] = "`$fieldName` LIKE " . $this->modx->quote("%$value%");
-                        break;
-                    case 'NOT LIKE':
-                        $where[] = "`$fieldName` NOT LIKE " . $this->modx->quote("%$value%");
-                        break;
-                    case 'IN':
-                        $inValues = implode(',', array_map([$modx, 'quote'], $value));
-                        $where[] = "`$fieldName` IN ($inValues)";
-                        break;
-                    case 'NOT IN':
-                        $notInValues = implode(',', array_map([$modx, 'quote'], $value));
-                        $where[] = "`$fieldName` NOT IN ($notInValues)";
-                        break;
-                    case 'IS':
-                        $where[] = "`$fieldName` IS " . ($value === null ? 'NULL' : $this->modx->quote($value));
-                        break;
-                    case 'IS NOT':
-                        $where[] = "`$fieldName` IS NOT " . ($value === null ? 'NULL' : $this->modx->quote($value));
-                        break;
-                }
-            } else {
-                $where[] = "`$field` = " . $this->modx->quote($value);
-            }
-        }
-
-        return !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
     }
 
     public function output(): array
@@ -330,6 +222,7 @@ class FastPaginate
                 'last_key' => $request['last_key'] ?? ''
             ]
         );
+        $this->query->update($this->properties);
         $this->response->action = $action;
         $this->response->current_page = $request['load_page'] ?? 1;
 
@@ -350,7 +243,7 @@ class FastPaginate
         };
     }
 
-    public function loadMore($request): array
+    public function loadMore(array $request = []): array
     {
         if (empty($this->properties['last_key'])) {
             $this->properties['offset'] += $this->properties['limit'];
@@ -363,7 +256,7 @@ class FastPaginate
         return $this->next();
     }
 
-    public function loadPage($request): array
+    public function loadPage(array $request = []): array
     {
         $step = $request['load_page'] - $request['current_page'];
         if ($step === 1) {
