@@ -10,12 +10,15 @@ if ($modx->services instanceof MODX\Revolution\Services\Container) {
     $fastpaginate = $modx->getService('fastpaginate', 'FastPaginate', MODX_CORE_PATH . 'components/fastpaginate/model/', (array)$scriptProperties);
 }
 
-$where = $modx->getOption('where', $scriptProperties, [], true);
-$paginate = $modx->getOption('paginate', $scriptProperties, false, true);
-$loadMore = $modx->getOption('loadMore', $scriptProperties, false, true);
+$loadMore = $modx->getOption('show.loadmore', $scriptProperties, false, true);
+$paginate = $modx->getOption('show.pagination', $scriptProperties, true, true);
 $chunk = $modx->getOption('tpl', $scriptProperties, '', true);
 
-$fastpaginate->filters($where);
+$fastpaginate->filters();
+
+if ($loadMore) {
+    $fastpaginate->loadMore();
+}
 
 if ($paginate) {
     $fastpaginate->paginate();

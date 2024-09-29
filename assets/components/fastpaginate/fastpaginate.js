@@ -13,7 +13,7 @@ class FastPaginate {
         this.total = config.total;
         this.last_key = config.last_key;
         this.items = this.wrapper.querySelector('.fp-items');
-        this.btnMore = this.wrapper.querySelector('.fp-more');
+        this.loadMore = this.wrapper.querySelector('.fp-loadmore');
         this.pagination = this.wrapper.querySelector('.fp-pagination');
 
         this.addEventListeners();
@@ -28,8 +28,9 @@ class FastPaginate {
     }
 
     addEventListeners() {
-        this.btnMore?.addEventListener('click', async ({ target }) => {
-            ++this.load_page;
+        this.loadMore?.addEventListener('click', async (event) => {
+            event.preventDefault();
+            this.load_page = this.current_page + 1;
 
             const response = await this.fetch('loadmore');
             await this.response(response);
@@ -99,11 +100,17 @@ class FastPaginate {
     updatePagination(response) {
         this.current_page = response.current_page;
         this.last_key = response?.last_key || '';
+        this.total = response.total;
         this.show = response.show;
 
-        if (this.pagination && response?.tplPagination !== '') {
+        if (this.loadMore) {
+            this.loadMore.style.display = (response?.next_link === '#') ? 'none' : 'flex';
+            this.loadMore.setAttribute('href', response?.next_link || '');
+        }
+
+        if (this.pagination && response?.tpl_pagination !== '') {
             const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = response.tplPagination;
+            tempDiv.innerHTML = response.tpl_pagination;
             const paginationContent = tempDiv.querySelector('.fp-pagination').innerHTML;
             this.pagination.innerHTML = paginationContent;
         }

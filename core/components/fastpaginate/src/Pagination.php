@@ -6,10 +6,28 @@ class Pagination
 {
     public function __construct
     (
-        private readonly int $currentPage,
-        private readonly int $totalPages,
-        private readonly string $baseUrl = '')
+        public readonly int $currentPage,
+        public readonly int $totalPages,
+        public readonly string $baseUrl = '')
     {}
+
+    public function prevLink(): string
+    {
+        if ($this->currentPage > 1) {
+            return $this->generateLink($this->currentPage - 1);
+        }
+
+        return '#';
+    }
+
+    public function nextLink(): string
+    {
+        if ($this->currentPage < $this->totalPages) {
+            return $this->generateLink($this->currentPage + 1);
+        }
+
+        return '#';
+    }
 
     private function generateLink(int|string $page): string
     {
@@ -21,9 +39,7 @@ class Pagination
         return [
             'page' => $this->currentPage - 1,
             'num' => $this->currentPage - 1,
-            'href' => $this->currentPage > 1
-                ? $this->generateLink($this->currentPage - 1)
-                : '#',
+            'href' => $this->prevLink(),
             'is_current' => $this->currentPage == 1,
             'direction' => 'prev'
         ];
@@ -34,9 +50,7 @@ class Pagination
         return [
             'page' => $this->currentPage + 1,
             'num' => $this->currentPage + 1,
-            'href' => $this->currentPage < $this->totalPages
-                ? $this->generateLink($this->currentPage + 1)
-                : '#',
+            'href' => $this->nextLink(),
             'is_current' => $this->currentPage == $this->totalPages,
             'direction' => 'next'
         ];
@@ -46,7 +60,6 @@ class Pagination
     {
         $currentPage = $this->currentPage;
         $totalPages = $this->totalPages;
-        $baseUrl = $this->baseUrl;
         $pagination = [];
 
         $pagination[] = [

@@ -8,11 +8,13 @@ class Response
     private int $total = 0;
     private int $limit = 10;
     private int $offset = 0;
-    private int $current_page = 1;
+    private int $currentPage = 1;
     private string $sortby = 'id';
     private string $sortdir = 'ASC';
-    private bool $paginate = false;
+    private bool $showLoadMore = false;
+    private bool $showPaginate = false;
     private string $tplPagination = '';
+    private string $nextLink = '';
     private array $errors = [];
     public function __construct(public array $data = []) {}
 
@@ -42,24 +44,25 @@ class Response
             'errors' => $this->errors,
         ];
 
-        if ($this->paginate) {
+        if ($this->showLoadMore) {
+            $response['next_link'] = $this->nextLink;
+        }
+
+        if ($this->showPaginate) {
             $count = count($this->data);
             $lastKey = end($this->data)[$this->sortby] ?? null;
             $response = array_merge($response, [
                 'limit' => $this->limit,
                 'offset' => $this->offset,
                 'count' => $count,
-                'show' =>  $this->limit * ($this->current_page - 1)  + $count,
-                'current_page' => $this->current_page,
+                'show' =>  $this->limit * ($this->currentPage - 1)  + $count,
+                'current_page' => $this->currentPage,
                 'last_key' => $lastKey,
                 'last_page' => $this->total
                     ? ceil($this->total / $this->limit)
                     : 0,
+                'tpl_pagination' => $this->tplPagination,
             ]);
-
-            if (!empty($this->tplPagination)) {
-                $response['tplPagination'] = $this->tplPagination;
-            }
         }
 
         $response['output'] = $output ?: $this->data;

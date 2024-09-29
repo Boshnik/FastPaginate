@@ -64,14 +64,6 @@ class Query
 
     public function createWhere(array $filters = []): string
     {
-        if (is_string($filters)) {
-            $filters = json_decode($filters, true);
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                $this->modx->log(1, 'Error when decoding filters.');
-                return '';
-            }
-        }
-
         $where = [];
         foreach ($filters as $field => $value) {
             if (strpos($field, ':') !== false) {
