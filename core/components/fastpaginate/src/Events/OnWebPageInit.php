@@ -2,9 +2,6 @@
 
 namespace Boshnik\FastPaginate\Events;
 
-/**
- * class OnWebPageInit
- */
 class OnWebPageInit extends Event
 {
     public function run(): void

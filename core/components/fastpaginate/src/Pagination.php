@@ -8,15 +8,22 @@ class Pagination
     (
         private readonly int $currentPage,
         private readonly int $totalPages,
-        private readonly string $baseUrl = '?page=')
+        private readonly string $baseUrl = '')
     {}
+
+    private function generateLink(int|string $page): string
+    {
+        return str_replace('{page}', $page, $this->baseUrl);
+    }
 
     public function prev(): array
     {
         return [
             'page' => $this->currentPage - 1,
             'num' => $this->currentPage - 1,
-            'href' => $this->currentPage > 1 ? '?page=' . ($this->currentPage - 1) : '#',
+            'href' => $this->currentPage > 1
+                ? $this->generateLink($this->currentPage - 1)
+                : '#',
             'is_current' => $this->currentPage == 1,
             'direction' => 'prev'
         ];
@@ -27,7 +34,9 @@ class Pagination
         return [
             'page' => $this->currentPage + 1,
             'num' => $this->currentPage + 1,
-            'href' => $this->currentPage < $this->totalPages ? '?page=' . ($this->currentPage + 1) : '#',
+            'href' => $this->currentPage < $this->totalPages
+                ? $this->generateLink($this->currentPage + 1)
+                : '#',
             'is_current' => $this->currentPage == $this->totalPages,
             'direction' => 'next'
         ];
@@ -43,7 +52,7 @@ class Pagination
         $pagination[] = [
             'page' => 1,
             'num' => 1,
-            'href' => $baseUrl . '1',
+            'href' => $this->generateLink(1),
             'is_current' => $currentPage == 1
         ];
 
@@ -67,7 +76,7 @@ class Pagination
             $pagination[] = [
                 'page' => '...',
                 'num' => $startPage - 1,
-                'href' => $baseUrl . ($startPage - 1),
+                'href' => $this->generateLink($startPage - 1),
                 'is_current' => false
             ];
         }
@@ -76,7 +85,7 @@ class Pagination
             $pagination[] = [
                 'page' => $i,
                 'num' => $i,
-                'href' => $baseUrl . $i,
+                'href' => $this->generateLink($i),
                 'is_current' => $currentPage == $i
             ];
         }
@@ -85,7 +94,7 @@ class Pagination
             $pagination[] = [
                 'page' => '...',
                 'num' => $endPage + 1,
-                'href' => $baseUrl . ($endPage + 1),
+                'href' => $this->generateLink($endPage + 1),
                 'is_current' => false
             ];
         }
@@ -93,7 +102,7 @@ class Pagination
         $pagination[] = [
             'page' => $totalPages,
             'num' => $totalPages,
-            'href' => $baseUrl . $totalPages,
+            'href' => $this->generateLink($totalPages),
             'is_current' => $currentPage == $totalPages
         ];
 

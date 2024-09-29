@@ -32,26 +32,60 @@ class FastPaginate
         $this->properties = array_merge([
             'className' => 'modResource',
             'wrapper' => "#{$this->namespace}",
+            'page' => 1,
             'where' => [],
             'limit' => 10,
             'offset' => 0,
             'sortby' => 'id',
             'sortdir' => 'ASC',
             'outputSeparator' => "\n",
+            'path' => $this->modx->getOption("{$this->namespace}_url_path", $this->properties, '', 1),
             'tpl' => '',
             'tpl.pagination' => 'fp.pagination',
             'tpl.pagination.direction' => 'fp.pagination.direction',
             'tpl.pagination.link' => 'fp.pagination.link',
             'pls.pagination' => 'pls.pagination',
-        ], array_filter($this->properties));
+        ], $this->properties);
 
         $this->crypt = new Crypt($this->modx->uuid);
         $this->response = new Response();
         $this->parser = new Parser($this->modx, $this->properties);
 
+        $this->properties['page'] = $this->getPageNumber();
+        if ($this->properties['page'] > 1) {
+            $this->properties['offset'] = ($this->properties['page'] - 1) * $this->properties['limit'];
+            $this->response->current_page = $this->properties['page'];
+        }
+
         $this->modx->addPackage($this->namespace, $this->config['modelPath']);
         $this->modx->lexicon->load("$this->namespace:default");
     }
+
+    public function getPageNumber()
+    {
+        if (empty($this->properties['path'])) {
+            return 1;
+        }
+
+        $currentUrl = $this->getCurrentUrl();
+        $pattern = preg_quote($this->properties['path'], '/');
+        $pattern = str_replace('\{page\}', '(\d+)', $pattern);
+
+        if (preg_match('/' . $pattern . '/', $currentUrl, $matches)) {
+            return $matches[1];
+        }
+
+        return 1;
+    }
+
+    public function getCurrentUrl(): string
+    {
+        $uri = ltrim($_SERVER['REQUEST_URI'], '/');
+
+        return MODX_SITE_URL . $uri;
+    }
+
+
 
     public function filters(array $where = []): static
     {
@@ -66,8 +100,8 @@ class FastPaginate
 
     public function paginate(): static
     {
-        $whereSQL = $this->createWhere($this->properties['where']);
         if ($this->response->total === 0) {
+            $whereSQL = $this->createWhere($this->properties['where']);
             $this->response->total = $this->getTotal($whereSQL);
         }
         $this->response->limit = $this->properties['limit'];
@@ -232,6 +266,8 @@ class FastPaginate
         $config = json_encode([
             'url' => $this->config['actionUrl'],
             'wrapper' => $this->properties['wrapper'],
+            'page' => $this->properties['page'],
+            'path' => $this->properties['path'],
             'last_key' => $lastKey,
             'total' => $this->response->total,
             'key' => $key,
@@ -259,7 +295,7 @@ class FastPaginate
             ? ceil($this->response->total / $this->properties['limit'])
             : 0;
 
-        $pagination = new Pagination($currentPage, $totalPages);
+        $pagination = new Pagination($currentPage, $totalPages, $this->properties['path']);
 
         $prev = $this->parser->item(
             $this->properties['tpl.pagination.direction'],

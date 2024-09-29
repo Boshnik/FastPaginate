@@ -1,13 +1,14 @@
 class FastPaginate {
     constructor(config) {
+        console.log(config);
         this.url = config.url;
         this.key = config.key;
         this.wrapper = document.querySelector(config.wrapper);
+        this.path = config.path || '?page={page}';
         if (!this.wrapper) {
             return;
         }
-        this.current_page = 1;
-        this.load_page = 1;
+        this.load_page = this.current_page = config.page;
         this.show = 0;
         this.total = config.total;
         this.last_key = config.last_key;
@@ -16,6 +17,14 @@ class FastPaginate {
         this.pagination = this.wrapper.querySelector('.fp-pagination');
 
         this.addEventListeners();
+    }
+
+    updateURL() {
+        let newPath = this.path.replace('{page}', this.load_page);
+        if (this.load_page === 1) {
+            newPath = this.path.includes('?') ? window.location.pathname : '/';
+        }
+        window.history.pushState({}, '', newPath);
     }
 
     addEventListeners() {
@@ -76,19 +85,20 @@ class FastPaginate {
         switch (response?.action) {
             case 'loadmore':
                 this.items.insertAdjacentHTML('beforeend', response.output);
-                this.updatePagination(response);
                 break;
 
             case 'paginate':
                 this.items.innerHTML = response.output;
-                this.updatePagination(response);
                 break;
         }
+
+        this.updatePagination(response);
+        this.updateURL();
     }
 
     updatePagination(response) {
         this.current_page = response.current_page;
-        this.last_key = response.last_key;
+        this.last_key = response?.last_key || '';
         this.show = response.show;
 
         if (this.pagination && response?.tplPagination !== '') {
