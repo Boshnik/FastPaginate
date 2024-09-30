@@ -11,24 +11,50 @@ class FastPaginate {
         this.load_page = this.current_page = config.page;
         this.show = 0;
         this.total = config.total;
+        this.sortby = config.sortby;
+        this.sortdir = config.sortdir;
         this.last_key = config.last_key;
         this.items = this.wrapper.querySelector('.fp-items');
         this.loadMore = this.wrapper.querySelector('.fp-loadmore');
         this.pagination = this.wrapper.querySelector('.fp-pagination');
+        this.sort = this.wrapper.querySelector('.fp-sort');
+        if (this.sort) {
+            let sort = this.sortby + '-' + this.sortdir;
+            let value = this.sort.querySelector(`[value="${sort}"]`);
+            if (value) {
+                value.selected = true;
+            }
+        }
+
+        this.urlMode = config.url_mode;
+        this.pathSeparator = config.path_separator;
+        this.pathPage = config.path_page;
+        this.pathSort = config.path_sort;
+        this.baseUrl = this.getBaseUrl();
 
         this.addEventListeners();
     }
 
-    updateURL() {
-        let newPath = this.path.replace('{page}', this.load_page);
-        if (this.load_page === 1) {
-            newPath = this.path.includes('?') ? window.location.pathname : '/';
+    getBaseUrl() {
+        let baseUrl = window.location.pathname;
+        if (this.urlMode === 'url') {
+            const pageString = this.pathPage.replace('{page}', this.current_page);
+            const sortString = this.pathSort
+                .replace('{sortby}', this.sortby)
+                .replace('{sortdir}', this.sortdir);
+
+            baseUrl = baseUrl.replace(pageString, '');
+            baseUrl = baseUrl.replace(sortString, '');
+
+            baseUrl = baseUrl.replace(new RegExp(`${this.pathSeparator}\/+$`), '');
+            baseUrl = baseUrl.replace(/\/+/g, '/');
         }
-        window.history.pushState({}, '', newPath);
+
+        return baseUrl;
     }
 
     addEventListeners() {
-        this.loadMore?.addEventListener('click', async (event) => {
+        this.loadMore?.addEventListener('click', async event => {
             event.preventDefault();
             this.load_page = this.current_page + 1;
 
@@ -36,7 +62,7 @@ class FastPaginate {
             await this.response(response);
         });
 
-        this.pagination?.addEventListener('click', async (event) => {
+        this.pagination?.addEventListener('click', async event => {
             const target = event.target.closest('.pagination-link');
 
             if (target) {
@@ -52,6 +78,15 @@ class FastPaginate {
                 return false;
             }
         });
+
+        this.sort?.addEventListener('change', async ({ target }) => {
+            console.log(target.value);
+            let [sortby, sortdir] = target.value.split('-');
+            this.sortby = sortby;
+            this.sortdir = sortdir;
+            const response = await this.fetch('sort');
+            await this.response(response);
+        });
     }
 
     async fetch(action, fields) {
@@ -62,6 +97,8 @@ class FastPaginate {
         data.append('current_page', this.current_page);
         data.append('load_page', this.load_page);
         data.append('last_key', this.last_key);
+        data.append('sortby', this.sortby);
+        data.append('sortdir', this.sortdir);
         for (let key in fields) {
             if (fields.hasOwnProperty(key)) {
                 data.append(key, fields[key]);
@@ -89,6 +126,7 @@ class FastPaginate {
                 break;
 
             case 'paginate':
+            case 'sort':
                 this.items.innerHTML = response.output;
                 break;
         }
@@ -115,4 +153,31 @@ class FastPaginate {
             this.pagination.innerHTML = paginationContent;
         }
     }
+
+    updateURL() {
+        let newPath = this.baseUrl;
+
+        const pagePath = this.pathPage.replace('{page}', this.load_page);
+        const sortParam = this.pathSort
+            .replace('{sortby}', this.sortby)
+            .replace('{sortdir}', this.sortdir);
+
+
+        if (this.load_page === 1) {
+            if (this.urlMode === 'get') {
+                newPath += sortParam ? `?${sortParam}` : '';
+            } else if (this.urlMode === 'url') {
+                newPath += sortParam ? `${sortParam}/` : '';
+            }
+        } else {
+            if (this.urlMode === 'get') {
+                newPath += `?${pagePath}` + (sortParam ? `&${sortParam}` : '').replace(/&$/, '');
+            } else if (this.urlMode === 'url') {
+                newPath += pagePath + (sortParam ? `${this.pathSeparator}${sortParam}/` : '/');
+            }
+        }
+
+        window.history.pushState({}, '', newPath);
+    }
+
 }

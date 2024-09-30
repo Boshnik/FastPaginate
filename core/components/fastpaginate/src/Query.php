@@ -24,8 +24,6 @@ class Query
     {
         $whereSQL = $this->createWhere($where);
         $subquery = $this->getSubQuery($whereSQL);
-        $sortby = $this->properties['sortby'];
-        $sortdir = $this->properties['sortdir'];
 
         $sql = "
             SELECT main.*
@@ -33,7 +31,6 @@ class Query
             JOIN (
                 $subquery
             ) AS subquery ON main.id = subquery.id
-            ORDER BY `$sortby` $sortdir
         ";
         $stmt = $this->modx->prepare($sql);
         $stmt->execute();
@@ -58,8 +55,17 @@ class Query
     {
         $limit = $this->properties['limit'];
         $offset = $this->properties['offset'];
+        $sortby = $this->properties['sortby'];
+        $sortdir = $this->properties['sortdir'];
 
-        return "SELECT `id` FROM {$this->table} {$where} LIMIT $limit OFFSET $offset";
+        return "
+            SELECT `id` 
+            FROM {$this->table} 
+            {$where} 
+            ORDER BY `$sortby` $sortdir
+            LIMIT $limit 
+            OFFSET $offset 
+        ";
     }
 
     public function createWhere(array $filters = []): string

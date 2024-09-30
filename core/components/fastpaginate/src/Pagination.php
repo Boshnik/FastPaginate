@@ -31,7 +31,7 @@ class Pagination
 
     private function generateLink(int|string $page): string
     {
-        return str_replace('{page}', $page, $this->baseUrl);
+        return '/' . str_replace('{page}', $page, $this->baseUrl);
     }
 
     public function prev(): array

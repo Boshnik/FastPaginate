@@ -14,34 +14,47 @@ class OnPageNotFound extends Event
             return false;
         }
 
-        $path = $this->modx->getOption("{$this->fastpaginate->namespace}_url_path", null, '', 1);
-        if (empty($path)) {
+        $properties = [
+            'url_mode' => $this->fastpaginate->getOption('url_mode'),
+            'path_separator' => $this->fastpaginate->getOption('path_separator'),
+            'path_page' => $this->fastpaginate->getOption('path_page'),
+            'path_sort' => $this->fastpaginate->getOption('path_sort'),
+        ];
+
+        if ($properties['url_mode'] !== 'url') {
             return false;
         }
-        $currentUrl = $this->fastpaginate->getCurrentUrl();
-        $page = $this->fastpaginate->getPageNumber();
 
-        $resourceId = $this->modx->getOption('site_start', null, 1, 1);
-
-        if ($page > 1) {
-            $siteUrl = rtrim(MODX_SITE_URL, '/');
-            $path = str_replace('{page}', $page, $path);
-            $uri = str_replace([$siteUrl, $path], '', $currentUrl);
-
-            if (empty($uri)) {
-                $aliases = explode('/', $uri);
-                $alias = end($aliases);
-                $this->modx->resource = $this->modx->getObject(\modResource::class, ['alias' => $alias]);
-            }
-
-            if (!$this->modx->resource) {
-                $this->modx->resource = $this->modx->getObject(\modResource::class, $resourceId);
-            }
-
-            $this->fastpaginate->loadScripts();
-            $this->modx->request->prepareResponse();
+        $params = $this->fastpaginate->getPageProperties();
+        $parts = [];
+        if (isset($params['page'])) {
+            $parts[] = str_replace('{page}', $params['page'], $properties['path_page']);
         }
 
-        $this->modx->sendRedirect($this->modx->makeUrl($resourceId));
+        if (isset($params['sortby']) && isset($params['sortdir'])) {
+            $parts[] = str_replace(['{sortby}', '{sortdir}'], [$params['sortby'], $params['sortdir']], $properties['path_sort']);
+        }
+
+        $path = implode($properties['path_separator'], $parts);
+        $currentUrl = $this->fastpaginate->getCurrentUrl();
+        $url_parts = parse_url($currentUrl);
+        $path = str_replace($path, '', $url_parts['path']);
+        $path = trim($path, '/');
+        $aliases = explode('/', $path);
+        $alias = end($aliases);
+
+        $resourceId = $this->modx->getOption('site_start', null, 1, 1);
+        if (empty($alias)) {
+            $this->modx->resource = $this->modx->getObject(\modResource::class, $resourceId);
+        } else {
+            $this->modx->resource = $this->modx->getObject(\modResource::class, ['alias' => $alias]);
+        }
+
+        if ($this->modx->resource) {
+            $this->fastpaginate->loadScripts();
+            $this->modx->request->prepareResponse();
+        } else {
+            $this->modx->sendRedirect($this->modx->makeUrl($resourceId));
+        }
     }
 }

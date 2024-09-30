@@ -38,9 +38,12 @@ class FastPaginate
             'sortby' => 'id',
             'sortdir' => 'ASC',
             'outputSeparator' => "\n",
-            'path' => $this->modx->getOption("{$this->namespace}_url_path", $this->properties, '', 1),
-
             'tpl' => '',
+
+            'url_mode' => $this->getOption('url_mode'),
+            'path_separator' => $this->getOption('path_separator'),
+            'path_page' => $this->getOption('path_page'),
+            'path_sort' => $this->getOption('path_sort'),
 
             'show.loadmore' => 0,
             'pls.loadmore' => 'pls.loadmore',
@@ -62,12 +65,13 @@ class FastPaginate
             }
         }
 
+        $this->properties = [...$this->properties, ...$this->getPageProperties()];
+
         $this->query = new Query($this->modx, $this->properties);
         $this->crypt = new Crypt($this->modx->uuid);
-        $this->response = new Response();
+        $this->response = new Response($this->properties);
         $this->parser = new Parser($this->modx, $this->properties);
 
-        $this->properties['page'] = $this->getPageNumber();
         if ($this->properties['page'] > 1) {
             $this->properties['offset'] = ($this->properties['page'] - 1) * $this->properties['limit'];
             $this->response->currentPage = $this->properties['page'];
@@ -77,21 +81,47 @@ class FastPaginate
         $this->modx->lexicon->load("$this->namespace:default");
     }
 
-    public function getPageNumber(): int
+    public function getOption($name): string
     {
-        if (empty($this->properties['path'])) {
-            return 1;
-        }
+        return $this->modx->getOption("{$this->namespace}_{$name}", $this->properties, '', 1);
+    }
 
+    public function getPageProperties(): array
+    {
+        $result = [];
         $currentUrl = $this->getCurrentUrl();
-        $pattern = preg_quote($this->properties['path'], '/');
-        $pattern = str_replace('\{page\}', '(\d+)', $pattern);
+        $url_parts = parse_url($currentUrl);
+        $separator = $this->properties['path_separator'];
+        $templates = [
+            'page' => $this->properties['path_page'],
+            'sort' => $this->properties['path_sort'],
+        ];
 
-        if (preg_match('/' . $pattern . '/', $currentUrl, $matches)) {
-            return $matches[1];
+        if ($this->properties['url_mode'] === 'url') {
+            $path = $url_parts['path'];
+            $query = $url_parts['query'] ?? '';
+            $full_path = trim($path, '/') . ($query ? "?" . $query : '');
+        } else {
+            $path = $url_parts['query'];
+            $full_path = trim($path, '/');
+            $separator = '&';
         }
 
-        return 1;
+        foreach ($templates as $key => $template) {
+            $regex = preg_replace_callback('/\{([a-z]+)\}/', function ($matches) use ($separator) {
+                return '(?P<' . $matches[1] . '>[^' . $separator . '/?]+)';
+            }, $template);
+
+            if (preg_match('#' . $regex . '#', $full_path, $matches)) {
+                foreach ($matches as $k => $v) {
+                    if (!is_int($k)) {
+                        $result[$k] = $v;
+                    }
+                }
+            }
+        }
+
+        return $result;
     }
 
     public function getCurrentUrl(): string
@@ -138,21 +168,32 @@ class FastPaginate
         $where = $this->properties['where'];
         if (!empty($last_key)) {
             $sortby = $this->properties['sortby'];
-            if ($this->properties['sortdir'] === 'ASC') {
+            $sortdir = strtolower($this->properties['sortdir']);
+            if ($sortdir === 'asc') {
                 $where["$sortby:>"] = $last_key;
             } else {
                 $where["$sortby:<"] = $last_key;
             }
         }
 
-        return $this->filters($where)->loadMore()->paginate()->output();
+        return $this->process($where);
     }
 
     public function loadPage(int $page = 1): array
     {
         $this->properties['offset'] = ($page - 1) * $this->properties['limit'];
 
-        return $this->filters($this->properties['where'])->loadMore()->paginate()->output();
+        return $this->process($this->properties['where']);
+    }
+
+    public function sortPage($sortby = 'id', $sortdir = 'asc'): array
+    {
+        return $this->process($this->properties['where']);
+    }
+
+    public function process(array $where = []): array
+    {
+        return $this->filters($where)->loadMore()->paginate()->output();
     }
 
     public function output(): array
@@ -190,8 +231,13 @@ class FastPaginate
         $config = json_encode([
             'url' => $this->config['actionUrl'],
             'wrapper' => $this->properties['wrapper'],
-            'page' => $this->properties['page'],
-            'path' => $this->properties['path'],
+            'page' => (int)$this->properties['page'],
+            'url_mode' =>  $this->properties['url_mode'],
+            'path_separator' =>  $this->properties['path_separator'],
+            'path_page' =>  $this->properties['path_page'],
+            'path_sort' =>  $this->properties['path_sort'],
+            'sortby' => $this->properties['sortby'],
+            'sortdir' => $this->properties['sortdir'],
             'last_key' => $lastKey,
             'total' => $this->response->total,
             'key' => $key,
@@ -203,7 +249,7 @@ class FastPaginate
             $totalPages = $this->response->total
                 ? ceil($this->response->total / $this->properties['limit'])
                 : 0;
-            $pagination = new Pagination($currentPage, $totalPages, $this->properties['path']);
+            $pagination = new Pagination($currentPage, $totalPages, $this->properties['path_page']);
 
             // Load more
             if ($this->properties['show.loadmore']) {
@@ -274,7 +320,9 @@ class FastPaginate
         $this->properties = array_merge(
             $this->crypt->decrypt($request['key']),
             [
-                'last_key' => $request['last_key'] ?? ''
+                'last_key' => $request['last_key'] ?? '',
+                'sortby' => $request['sortby'] ?? $this->properties['sortby'],
+                'sortdir' => $request['sortdir'] ?? $this->properties['sortdir'],
             ]
         );
         $this->query->update($this->properties);
@@ -288,6 +336,7 @@ class FastPaginate
         return match ($action) {
             'loadmore' => $this->preparePage($request),
             'paginate' => $this->preparePage($request),
+            'sort' => $this->sortPage($this->properties['sortby'], $this->properties['sortdir']),
             default => $this->response->failure('Action not allowed'),
         };
     }
@@ -300,7 +349,7 @@ class FastPaginate
         $pagination = new Pagination(
             $this->response->currentPage,
             $totalPages,
-            $this->properties['path']
+            $this->properties['path_page']
         );
 
         if ($this->properties['show.loadmore'] ?? false) {

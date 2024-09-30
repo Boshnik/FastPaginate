@@ -16,7 +16,16 @@ class Response
     private string $tplPagination = '';
     private string $nextLink = '';
     private array $errors = [];
-    public function __construct(public array $data = []) {}
+
+    public array $data = [];
+    public function __construct(array $properties = [])
+    {
+        foreach ($properties as $name => $value) {
+            if (property_exists($this, $name)) {
+                $this->$name = $value;
+            }
+        }
+    }
 
     public function __set($name, $value)
     {
@@ -63,6 +72,11 @@ class Response
                     : 0,
                 'tpl_pagination' => $this->tplPagination,
             ]);
+        }
+
+        if ($this->showLoadMore || $this->showPaginate) {
+            $response['sortby'] = $this->sortby;
+            $response['sortdir'] = $this->sortdir;
         }
 
         $response['output'] = $output ?: $this->data;
