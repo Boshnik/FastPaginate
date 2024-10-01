@@ -27,4 +27,14 @@ class Parser
     {
         return $this->modx->getChunk($tpl, $params);
     }
+
+    public function setPlaceholder($name, $value): void
+    {
+        if (!empty($this->properties["pls.$name"] ?? '')) {
+            $this->modx->setPlaceholder(
+                $this->properties["pls.$name"],
+                $value
+            );
+        }
+    }
 }

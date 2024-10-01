@@ -79,7 +79,7 @@ class FastPaginate
             'tpl.pagination.direction' => 'fp.pagination.direction',
             'tpl.pagination.link' => 'fp.pagination.link',
 
-            'pls.total' => 'pls.total'
+            'pls.total' => 'pls.total',
         ];
     }
 
@@ -262,12 +262,18 @@ class FastPaginate
             'key' => $key,
         ]);
 
-        if (!empty($this->properties['pls.total'])) {
-            $this->modx->setPlaceholder(
-                $this->properties['pls.total'],
-                $this->response->total
-            );
-        }
+        $this->setPlaceholders();
+
+        $this->modx->regClientScript("<script>
+            document.addEventListener('DOMContentLoaded', () => {
+                new FastPaginate({$config});
+            });
+        </script>", true);
+    }
+
+    public function setPlaceholders(): void
+    {
+        $this->parser->setPlaceholder('total', $this->response->total);
 
         $show = $this->response->total > $this->properties['limit'];
         if ($show) {
@@ -278,27 +284,11 @@ class FastPaginate
             $pagination = new Pagination($currentPage, $totalPages, $this->properties['path_page']);
 
             // Load more
-            if ($this->properties['show.loadmore']) {
-                $this->modx->setPlaceholder(
-                    $this->properties['pls.loadmore'],
-                    $this->getLoadMore($pagination)
-                );
-            }
+            $this->parser->setPlaceholder('loadmore', $this->getLoadMore($pagination));
 
             // Pagination
-            if ($show && $this->properties['show.pagination']) {
-                $this->modx->setPlaceholder(
-                    $this->properties['pls.pagination'],
-                    $this->getPagination($pagination)
-                );
-            }
+            $this->parser->setPlaceholder('pagination', $this->getPagination($pagination));
         }
-
-        $this->modx->regClientScript("<script>
-            document.addEventListener('DOMContentLoaded', () => {
-                new FastPaginate({$config});
-            });
-        </script>", true);
     }
 
     public function getLoadMore($pagination): string
