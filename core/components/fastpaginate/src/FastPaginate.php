@@ -10,6 +10,7 @@ class FastPaginate
     public Crypt $crypt;
     public Response $response;
     public Parser $parser;
+    public array $keySetPaginataion = ['id', 'menuindex'];
     public array $data = [];
 
     /**
@@ -370,7 +371,7 @@ class FastPaginate
         }
 
         $step = $request['load_page'] - $request['current_page'];
-        if ($step === 1) {
+        if (in_array($this->properties['sortby'], $this->keySetPaginataion) && $step === 1) {
             if (empty($this->properties['last_key'])) {
                 $this->properties['offset'] += $this->properties['limit'];
             } else {
