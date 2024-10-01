@@ -55,6 +55,8 @@ class FastPaginate
             'tpl.pagination' => 'fp.pagination',
             'tpl.pagination.direction' => 'fp.pagination.direction',
             'tpl.pagination.link' => 'fp.pagination.link',
+
+            'pls.total' => 'pls.total',
         ], $this->properties);
 
         if (is_string($this->properties['where'])) {
@@ -242,6 +244,13 @@ class FastPaginate
             'total' => $this->response->total,
             'key' => $key,
         ]);
+
+        if (!empty($this->properties['pls.total'])) {
+            $this->modx->setPlaceholder(
+                $this->properties['pls.total'],
+                $this->response->total
+            );
+        }
 
         $show = $this->response->total > $this->properties['limit'];
         if ($show) {
