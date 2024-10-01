@@ -25,8 +25,13 @@ class Query
         $whereSQL = $this->createWhere($where);
         $subquery = $this->getSubQuery($whereSQL);
 
+        $fields = array_map(function ($field) {
+            return "main.$field";
+        }, explode(',', $this->properties['fields']));
+        $fields = implode(',', $fields);
+
         $sql = "
-            SELECT main.*
+            SELECT {$fields}
             FROM {$this->table} AS main
             JOIN (
                 $subquery

@@ -52,6 +52,7 @@ class FastPaginate
     {
         return [
             'className' => 'modResource',
+            'fields' => '*',
             'wrapper' => "#{$this->namespace}",
             'page' => 1,
             'where' => [],
