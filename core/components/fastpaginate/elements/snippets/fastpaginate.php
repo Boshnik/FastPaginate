@@ -13,6 +13,7 @@ if ($modx->services instanceof MODX\Revolution\Services\Container) {
 $loadMore = $modx->getOption('show.loadmore', $scriptProperties, false, true);
 $paginate = $modx->getOption('show.pagination', $scriptProperties, true, true);
 $chunk = $modx->getOption('tpl', $scriptProperties, '', true);
+$toPlaceholder = $modx->getOption('toPlaceholder', $scriptProperties, '', true);
 
 $fastpaginate->filters();
 
@@ -26,11 +27,19 @@ if ($paginate) {
 
 $fastpaginate->init();
 
-if (!empty($chunk)) {
+$output = '';
+if (empty($chunk)) {
+    $output = $fastpaginate->json();
+} else {
     $response = $fastpaginate->chunk($chunk);
     if ($response['success']) {
-        return $response['output'];
+        $output = $response['output'];
     }
 }
 
-return $fastpaginate->json();
+if (!empty($toPlaceholder)) {
+    $modx->setPlaceholder($toPlaceholder, $output);
+    return '';
+}
+
+return $output;
