@@ -5,19 +5,20 @@ namespace Boshnik\FastPaginate;
 class FastPaginate
 {
     public string $namespace = 'fastpaginate';
+    public array $keySetPaginataion = ['id', 'menuindex'];
     public array $config = [];
+    public array $properties = [];
+    public array $data = [];
     public Query $query;
     public Crypt $crypt;
     public Response $response;
     public Parser $parser;
-    public array $keySetPaginataion = ['id', 'menuindex'];
-    public array $data = [];
 
     /**
      * @param modX $modx
      * @param array $config
      */
-    function __construct(public \modX $modx, public array $properties = [])
+    function __construct(public \modX $modx, public array $scriptProperties = [])
     {
         $assetsUrl = MODX_ASSETS_URL . "components/{$this->namespace}/";
         $corePath = MODX_CORE_PATH . "components/{$this->namespace}/";
@@ -29,7 +30,27 @@ class FastPaginate
             'siteUrl' => MODX_SITE_URL,
         ];
 
-        $this->properties = array_merge([
+        $this->prepareScriptProperties();
+        $this->properties = [...$this->defaultProperties(), ...$this->scriptProperties];
+        $this->properties = [...$this->properties, ...$this->getPageProperties()];
+
+        $this->query = new Query($this->modx, $this->properties);
+        $this->crypt = new Crypt($this->modx->uuid);
+        $this->response = new Response($this->properties);
+        $this->parser = new Parser($this->modx, $this->properties);
+
+        if ($this->properties['page'] > 1) {
+            $this->properties['offset'] = ($this->properties['page'] - 1) * $this->properties['limit'];
+            $this->response->currentPage = $this->properties['page'];
+        }
+
+        $this->modx->addPackage($this->namespace, $this->config['modelPath']);
+        $this->modx->lexicon->load("$this->namespace:default");
+    }
+
+    public function defaultProperties(): array
+    {
+        return [
             'className' => 'modResource',
             'wrapper' => "#{$this->namespace}",
             'page' => 1,
@@ -57,36 +78,28 @@ class FastPaginate
             'tpl.pagination.direction' => 'fp.pagination.direction',
             'tpl.pagination.link' => 'fp.pagination.link',
 
-            'pls.total' => 'pls.total',
-        ], $this->properties);
-
-        if (is_string($this->properties['where'])) {
-            $this->properties['where'] = json_decode($this->properties['where'], true);
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                $this->modx->log(1, 'Error when decoding filters.');
-                $this->properties['where'] = [];
-            }
-        }
-
-        $this->properties = [...$this->properties, ...$this->getPageProperties()];
-
-        $this->query = new Query($this->modx, $this->properties);
-        $this->crypt = new Crypt($this->modx->uuid);
-        $this->response = new Response($this->properties);
-        $this->parser = new Parser($this->modx, $this->properties);
-
-        if ($this->properties['page'] > 1) {
-            $this->properties['offset'] = ($this->properties['page'] - 1) * $this->properties['limit'];
-            $this->response->currentPage = $this->properties['page'];
-        }
-
-        $this->modx->addPackage($this->namespace, $this->config['modelPath']);
-        $this->modx->lexicon->load("$this->namespace:default");
+            'pls.total' => 'pls.total'
+        ];
     }
 
     public function getOption($name): string
     {
         return $this->modx->getOption("{$this->namespace}_{$name}", $this->properties, '', 1);
+    }
+
+    public function prepareScriptProperties(): void
+    {
+        if (empty($this->scriptProperties['where'] ?? '')) {
+            $this->scriptProperties['where'] = [];
+        }
+
+        if (is_string($this->scriptProperties['where'])) {
+            $this->scriptProperties['where'] = json_decode($this->scriptProperties['where'], true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                $this->modx->log(1, 'Error when decoding filters.');
+                $this->scriptProperties['where'] = [];
+            }
+        }
     }
 
     public function getPageProperties(): array
@@ -105,7 +118,7 @@ class FastPaginate
             $query = $url_parts['query'] ?? '';
             $full_path = trim($path, '/') . ($query ? "?" . $query : '');
         } else {
-            $path = $url_parts['query'];
+            $path = $url_parts['query'] ?? '';
             $full_path = trim($path, '/');
             $separator = '&';
         }
@@ -126,6 +139,8 @@ class FastPaginate
 
         return $result;
     }
+
+
 
     public function getCurrentUrl(): string
     {
@@ -226,13 +241,13 @@ class FastPaginate
 
     public function init()
     {
-        $key = $this->crypt->encrypt($this->properties);
+        $key = $this->crypt->encrypt($this->scriptProperties);
         if (is_array($key)) {
             return false;
         }
         $lastKey = end($this->data)[$this->properties['sortby']] ?? null;
         $config = json_encode([
-            'url' => $this->config['actionUrl'],
+            'actionUrl' => $this->config['actionUrl'],
             'wrapper' => $this->properties['wrapper'],
             'page' => (int)$this->properties['page'],
             'url_mode' =>  $this->properties['url_mode'],
@@ -328,6 +343,7 @@ class FastPaginate
     public function handleRequest(string $action, array $request = []): array
     {
         $this->properties = array_merge(
+            $this->defaultProperties(),
             $this->crypt->decrypt($request['key']),
             [
                 'last_key' => $request['last_key'] ?? '',

@@ -1,7 +1,7 @@
 class FastPaginate {
     constructor(config) {
         console.log(config);
-        this.url = config.url;
+        this.url = config.actionUrl;
         this.key = config.key;
         this.wrapper = document.querySelector(config.wrapper);
         this.path = config.path || '?page={page}';
