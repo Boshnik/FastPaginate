@@ -21,8 +21,10 @@ class OnPageNotFound extends Event
             'path_sort' => $this->fastpaginate->getOption('path_sort'),
         ];
 
+        $resourceId = $this->modx->getOption('site_start', null, 1, 1);
+
         if ($properties['url_mode'] !== 'url') {
-            return false;
+            $this->modx->sendRedirect($this->modx->makeUrl($resourceId));
         }
 
         $params = $this->fastpaginate->getPageProperties();
@@ -43,7 +45,6 @@ class OnPageNotFound extends Event
         $aliases = explode('/', $path);
         $alias = end($aliases);
 
-        $resourceId = $this->modx->getOption('site_start', null, 1, 1);
         if (empty($alias)) {
             $this->modx->resource = $this->modx->getObject(\modResource::class, $resourceId);
         } else {

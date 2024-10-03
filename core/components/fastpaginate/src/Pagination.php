@@ -31,7 +31,7 @@ class Pagination
 
     private function generateLink(int|string $page): string
     {
-        return '/' . str_replace('{page}', $page, $this->baseUrl);
+        return str_replace('{page}', $page, $this->baseUrl);
     }
 
     public function prev(): array
@@ -41,7 +41,7 @@ class Pagination
             'num' => $this->currentPage - 1,
             'href' => $this->prevLink(),
             'is_current' => $this->currentPage == 1,
-            'direction' => 'prev'
+            'direction' => 'prev',
         ];
     }
 
@@ -52,7 +52,7 @@ class Pagination
             'num' => $this->currentPage + 1,
             'href' => $this->nextLink(),
             'is_current' => $this->currentPage == $this->totalPages,
-            'direction' => 'next'
+            'direction' => 'next',
         ];
     }
 

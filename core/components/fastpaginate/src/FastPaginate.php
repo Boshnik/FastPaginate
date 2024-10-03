@@ -281,12 +281,10 @@ class FastPaginate
             $totalPages = $this->response->total
                 ? ceil($this->response->total / $this->properties['limit'])
                 : 0;
-            $pagination = new Pagination($currentPage, $totalPages, $this->properties['path_page']);
+            $mode = $this->properties['url_mode'] === 'get' ? '?' : '/';
+            $pagination = new Pagination($currentPage, $totalPages, $mode . $this->properties['path_page']);
 
-            // Load more
             $this->parser->setPlaceholder('loadmore', $this->getLoadMore($pagination));
-
-            // Pagination
             $this->parser->setPlaceholder('pagination', $this->getPagination($pagination));
         }
     }
@@ -363,10 +361,11 @@ class FastPaginate
         $totalPages = $this->response->total
             ? ceil($this->response->total / $this->properties['limit'])
             : 0;
+        $mode = $this->properties['path_page'] === 'get' ? '?' : '/';
         $pagination = new Pagination(
             $this->response->currentPage,
             $totalPages,
-            $this->properties['path_page']
+            $mode . $this->properties['path_page']
         );
 
         if ($this->properties['show.loadmore'] ?? false) {
