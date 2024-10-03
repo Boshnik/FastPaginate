@@ -25,9 +25,13 @@ class Query
         $whereSQL = $this->createWhere($where);
         $subquery = $this->getSubQuery($whereSQL);
 
+        $fields = explode(',', $this->properties['fields']);
+        if (!in_array('id', $fields)) {
+            $fields[] = 'id';
+        }
         $fields = array_map(function ($field) {
             return "main.$field";
-        }, explode(',', $this->properties['fields']));
+        }, $fields);
         $fields = implode(',', $fields);
 
         $sql = "
@@ -125,5 +129,46 @@ class Query
         }
 
         return !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
+    }
+
+    public function getUnique(string $field)
+    {
+//        $sql = "
+//            SELECT DISTINCT TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(t.{$field}, ',', numbers.n), ',', -1)) AS {$field}
+//            FROM {$this->table} t
+//            JOIN (SELECT 1 n UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9 UNION SELECT 10) numbers
+//            ON CHAR_LENGTH(t.{$field})
+//            -CHAR_LENGTH(REPLACE(t.{$field}, ',', ''))>=numbers.n-1
+//            ORDER BY {$field};
+//        ";
+
+        $sql = "
+            SELECT GROUP_CONCAT(DISTINCT TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(t.{$field}, ',', numbers.n), ',', -1)) ORDER BY {$field} SEPARATOR ',') AS list
+            FROM {$this->table} t
+            JOIN (
+                SELECT 1 n UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9 UNION SELECT 10
+            ) numbers
+            ON CHAR_LENGTH(t.{$field}) - CHAR_LENGTH(REPLACE(t.{$field}, ',', '')) >= numbers.n-1;
+        ";
+
+        $stmt = $this->modx->prepare($sql);
+        $stmt->execute();
+
+        return $stmt->fetch(\PDO::FETCH_ASSOC);
+    }
+
+    public function getBetweenValues(string $field)
+    {
+        $sql = "
+            SELECT 
+                MIN({$field}) AS min,
+                MAX({$field}) AS max
+            FROM {$this->table};
+        ";
+
+        $stmt = $this->modx->prepare($sql);
+        $stmt->execute();
+
+        return $stmt->fetch(\PDO::FETCH_ASSOC);
     }
 }
