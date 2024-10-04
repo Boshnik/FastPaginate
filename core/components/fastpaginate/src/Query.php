@@ -130,6 +130,13 @@ class Query
                     case 'IS NOT':
                         $where[] = "`$fieldName` IS NOT " . ($value === null ? 'NULL' : $this->modx->quote($value));
                         break;
+                    case 'BETWEEN':
+                        if (is_array($value) && count($value) === 2) {
+                            $min = $this->modx->quote($value['min']);
+                            $max = $this->modx->quote($value['max']);
+                            $where[] = "`$fieldName` BETWEEN $min AND $max";
+                        }
+                        break;
                 }
             } else {
                 $where[] = "`$field` = " . $this->modx->quote($value);

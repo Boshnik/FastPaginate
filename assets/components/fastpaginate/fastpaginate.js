@@ -113,18 +113,19 @@ class FastPaginate {
     }
 
     formDataToObject(formData) {
-        const obj = {};
+        const object = {};
         formData.forEach((value, key) => {
-            if (obj.hasOwnProperty(key)) {
-                if (!Array.isArray(obj[key])) {
-                    obj[key] = [obj[key]];
+            const keys = key.match(/[^\[\]]+/g);
+            keys.reduce((acc, cur, i) => {
+                if (i === keys.length - 1) {
+                    acc[cur] = value;
+                } else {
+                    acc[cur] = acc[cur] || {};
                 }
-                obj[key].push(value);
-            } else {
-                obj[key] = value;
-            }
+                return acc[cur];
+            }, object);
         });
-        return obj;
+        return object;
     }
 
     async fetch(action, fields) {
