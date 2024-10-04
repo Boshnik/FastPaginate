@@ -8,17 +8,22 @@ class Crypt
 
     public function encrypt($input): array|string
     {
-        $iv = openssl_random_pseudo_bytes(openssl_cipher_iv_length('aes-256-cbc'));
-
-        if ($iv === false) {
-            return ['error' => 'Error generating IV'];
+        $iv = $this->generateIv();
+        if (is_array($iv)) {
+            return $iv;
         }
 
         $input = json_encode($input);
+        if ($input === false) {
+            return ['error' => 'Error encoding JSON'];
+        }
 
         $encryptedData = openssl_encrypt($input, 'aes-256-cbc', $this->key, 0, $iv);
-        $encryptedPayload = base64_encode($encryptedData . '::' . $iv);
+        if ($encryptedData === false) {
+            return ['error' => 'Error encrypting data'];
+        }
 
+        $encryptedPayload = base64_encode($encryptedData . '::' . $iv);
         return str_replace('/', '_', $encryptedPayload);
     }
 
@@ -31,8 +36,8 @@ class Crypt
         }
 
         list($encryptedData, $iv) = explode('::', $data, 2);
-        if ($iv === false || $encryptedData === false) {
-            return ['error' => 'Error extracting IV or encrypted data'];
+        if (!$encryptedData || !$iv) {
+            return ['error' => 'Invalid data format'];
         }
 
         $decryptedData = openssl_decrypt($encryptedData, 'aes-256-cbc', $this->key, 0, $iv);
@@ -47,4 +52,14 @@ class Crypt
 
         return $output;
     }
+
+    private function generateIv(): string|array
+    {
+        $iv = openssl_random_pseudo_bytes(openssl_cipher_iv_length('aes-256-cbc'));
+        if ($iv === false) {
+            return ['error' => 'Error generating IV'];
+        }
+        return $iv;
+    }
+
 }
