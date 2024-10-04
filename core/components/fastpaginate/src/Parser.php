@@ -16,7 +16,6 @@ class Parser
         }
         $output = [];
         foreach ($items as $item) {
-
             $output[] = $this->item($tpl, $item);
         }
 

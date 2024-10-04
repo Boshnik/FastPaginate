@@ -10,12 +10,6 @@ class Query
         private \modX $modx,
         private array &$properties
     ) {
-        $this->update($properties);
-    }
-
-    public function update(array $properties = []): void
-    {
-        $this->properties = $properties;
         $className = $properties['className'];
         $this->table = $this->modx->getTableName($className) ?? $className;
     }
@@ -103,10 +97,24 @@ class Query
                         $where[] = "`$fieldName` = " . $this->modx->quote($value);
                         break;
                     case 'LIKE':
-                        $where[] = "`$fieldName` LIKE " . $this->modx->quote("%$value%");
+                        if (is_array($value)) {
+                            $likeConditions = array_map(function ($val) use ($fieldName) {
+                                return "`$fieldName` LIKE " . $this->modx->quote("%$val%");
+                            }, $value);
+                            $where[] = '(' . implode(' OR ', $likeConditions) . ')';
+                        } else {
+                            $where[] = "`$fieldName` LIKE " . $this->modx->quote("%$value%");
+                        }
                         break;
                     case 'NOT LIKE':
-                        $where[] = "`$fieldName` NOT LIKE " . $this->modx->quote("%$value%");
+                        if (is_array($value)) {
+                            $notLikeConditions = array_map(function ($val) use ($fieldName) {
+                                return "`$fieldName` NOT LIKE " . $this->modx->quote("%$val%");
+                            }, $value);
+                            $where[] = '(' . implode(' AND ', $notLikeConditions) . ')';
+                        } else {
+                            $where[] = "`$fieldName` NOT LIKE " . $this->modx->quote("%$value%");
+                        }
                         break;
                     case 'IN':
                         $inValues = implode(',', array_map([$this->modx, 'quote'], $value));

@@ -18,6 +18,8 @@ class FastPaginate {
         this.loadMore = this.wrapper.querySelector('.fp-loadmore');
         this.pagination = this.wrapper.querySelector('.fp-pagination');
         this.sort = this.wrapper.querySelector('.fp-sort');
+        this.filters = this.wrapper.querySelector('.fp-filters');
+        this.filterChange = this.wrapper.querySelector('.fp-filters-change') ? 1 : 0;
         if (this.sort) {
             let sort = this.sortby + '-' + this.sortdir;
             let value = this.sort.querySelector(`[value="${sort}"]`);
@@ -80,37 +82,75 @@ class FastPaginate {
         });
 
         this.sort?.addEventListener('change', async ({ target }) => {
-            console.log(target.value);
             let [sortby, sortdir] = target.value.split('-');
             this.sortby = sortby;
             this.sortdir = sortdir;
             const response = await this.fetch('sort');
             await this.response(response);
         });
+
+        if (this.filterChange) {
+            this.filters?.addEventListener('change', event => {
+                event.preventDefault();
+                console.log(event.target.value);
+                this.filtersForm();
+            });
+        }
+        this.filters?.addEventListener('submit', event => {
+            event.preventDefault();
+            this.filtersForm();
+        });
+    }
+
+    async filtersForm () {
+        this.current_page = 0;
+        this.load_page = 1;
+        this.last_key = 0;
+        const data = new FormData(this.filters);
+        const jsonData = this.formDataToObject(data);
+        const response = await this.fetch('filters', { filters: jsonData });
+        await this.response(response);
+    }
+
+    formDataToObject(formData) {
+        const obj = {};
+        formData.forEach((value, key) => {
+            if (obj.hasOwnProperty(key)) {
+                if (!Array.isArray(obj[key])) {
+                    obj[key] = [obj[key]];
+                }
+                obj[key].push(value);
+            } else {
+                obj[key] = value;
+            }
+        });
+        return obj;
     }
 
     async fetch(action, fields) {
-        const data= new FormData();
-        data.append('action', action);
-        data.append('key', this.key);
-        data.append('total', this.total);
-        data.append('current_page', this.current_page);
-        data.append('load_page', this.load_page);
-        data.append('last_key', this.last_key);
-        data.append('sortby', this.sortby);
-        data.append('sortdir', this.sortdir);
-        for (let key in fields) {
-            if (fields.hasOwnProperty(key)) {
-                data.append(key, fields[key]);
-            }
+        const data = {
+            action: action,
+            key: this.key,
+            total: this.total,
+            current_page: this.current_page,
+            load_page: this.load_page,
+            last_key: this.last_key,
+            sortby: this.sortby,
+            sortdir: this.sortdir,
+            ...fields
+        };
+        if (action !== 'filters') {
+            data.filters = this.formDataToObject(new FormData(this.filters));
         }
+        console.log('fetch data', data);
 
         const response= await fetch(this.url, {
             method: 'POST',
             headers: {
                 'Accept': 'application/json',
+                'Content-Type': 'application/json',
             },
-            body: data
+            body: JSON.stringify(data)
         });
         if (!response.ok) {
             throw new Error('Failed to fetch data from server');
@@ -119,24 +159,22 @@ class FastPaginate {
     }
 
     async response(response) {
-        console.log(response);
-        switch (response?.action) {
-            case 'loadmore':
-                this.items.insertAdjacentHTML('beforeend', response.output);
-                break;
-
-            case 'paginate':
-            case 'sort':
-                this.items.innerHTML = response.output;
-                break;
+        console.log('response', response);
+        console.log(response?.action);
+        if (response?.action === 'loadmore') {
+            this.items.insertAdjacentHTML('beforeend', response.output);
+        } else {
+            this.items.innerHTML = response.output;
         }
 
         this.updatePagination(response);
         this.updateURL();
     }
 
+
+
     updatePagination(response) {
-        this.current_page = response.current_page;
+        this.current_page = response.page;
         this.last_key = response?.last_key || '';
         this.total = response.total;
         this.show = response.show;
@@ -146,11 +184,15 @@ class FastPaginate {
             this.loadMore.setAttribute('href', response?.next_link || '');
         }
 
-        if (this.pagination && response?.tpl_pagination !== '') {
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = response.tpl_pagination;
-            const paginationContent = tempDiv.querySelector('.fp-pagination').innerHTML;
-            this.pagination.innerHTML = paginationContent;
+        if (this.pagination) {
+            if (response?.tpl_pagination === '') {
+                this.pagination.innerHTML = '';
+            } else {
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = response.tpl_pagination;
+                const paginationContent = tempDiv.querySelector('.fp-pagination').innerHTML;
+                this.pagination.innerHTML = paginationContent;
+            }
         }
     }
 
