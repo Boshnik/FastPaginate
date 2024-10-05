@@ -168,18 +168,18 @@ class FastPaginate {
             this.items.innerHTML = response.output;
         }
 
-        this.updatePagination(response);
-        this.updateURL();
-    }
-
-
-
-    updatePagination(response) {
         this.current_page = response.page;
         this.last_key = response?.last_key || '';
         this.total = response.total;
         this.show = response.show;
 
+        this.updatePagination(response);
+        this.updateVariables();
+        this.updateURL();
+    }
+
+
+    updatePagination(response) {
         if (this.loadMore) {
             this.loadMore.style.display = (response?.next_link === '#') ? 'none' : 'flex';
             this.loadMore.setAttribute('href', response?.next_link || '');
@@ -195,6 +195,17 @@ class FastPaginate {
                 this.pagination.innerHTML = paginationContent;
             }
         }
+    }
+
+    updateVariables() {
+        let totals = this.wrapper.querySelectorAll('.fp-total');
+        totals.forEach(total => {
+           total.innerText = this.total.toLocaleString('en-US', {
+               minimumFractionDigits: 0,
+               maximumFractionDigits: 0,
+               useGrouping: true
+           }).replace(/,/g, ' ');
+        });
     }
 
     updateURL() {
