@@ -2,6 +2,9 @@
 
 namespace Boshnik\FastPaginate;
 
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
 use Boshnik\FastPaginate\Traits\Output;
 use Boshnik\FastPaginate\Traits\HandleRequest;
 
@@ -60,7 +63,9 @@ class FastPaginate
 
             'url_mode' => $this->getOption('url_mode'),
             'path_separator' => $this->getOption('path_separator'),
+            'path_page_name' => $this->getOption('path_page_name'),
             'path_page' => $this->getOption('path_page'),
+            'path_sort_name' => $this->getOption('path_sort_name'),
             'path_sort' => $this->getOption('path_sort'),
 
             'show.loadmore' => 0,
@@ -102,40 +107,68 @@ class FastPaginate
 
     public function getPageProperties(array $properties = []): array
     {
-        $result = [];
         $currentUrl = $this->getCurrentUrl();
         $url_parts = parse_url($currentUrl);
-        $separator = $properties['path_separator'];
-        $templates = [
-            'page' => $properties['path_page'],
-            'sort' => $properties['path_sort'],
-        ];
 
         if ($properties['url_mode'] === 'url') {
+            $separator = $properties['path_separator'];
+            $templates = [
+                'page' => $properties['path_page'],
+                'sort' => $properties['path_sort'],
+            ];
             $path = $url_parts['path'];
             $query = $url_parts['query'] ?? '';
             $full_path = trim($path, '/') . ($query ? "?" . $query : '');
+
+            foreach ($templates as $key => $template) {
+                $regex = preg_replace_callback('/\{([a-z]+)\}/', function ($matches) use ($separator) {
+                    return '(?P<' . $matches[1] . '>[^' . $separator . '/?]+)';
+                }, $template);
+
+                if (preg_match('#' . $regex . '#', $full_path, $matches)) {
+                    foreach ($matches as $k => $v) {
+                        if (!is_int($k)) {
+                            $result[$k] = $v;
+                        }
+                    }
+                }
+            }
+
         } else {
             $path = $url_parts['query'] ?? '';
             $full_path = trim($path, '/');
-            $separator = '&';
-        }
-
-        foreach ($templates as $key => $template) {
-            $regex = preg_replace_callback('/\{([a-z]+)\}/', function ($matches) use ($separator) {
-                return '(?P<' . $matches[1] . '>[^' . $separator . '/?]+)';
-            }, $template);
-
-            if (preg_match('#' . $regex . '#', $full_path, $matches)) {
-                foreach ($matches as $k => $v) {
-                    if (!is_int($k)) {
-                        $result[$k] = $v;
+            parse_str($full_path, $params);
+            foreach ($params as $param => $value) {
+                if ($param === 'sort') {
+                    [$sortby, $sortdir] = explode('-', $value);
+                    $properties['sortby'] = $sortby;
+                    $properties['sortdir'] = $sortdir;
+                } else if ($param === 'page') {
+                    $properties['page'] = $value;
+                } else {
+                    if (strpos($value, ',') !== false) {
+                        $value = explode(',', $value);
                     }
+
+                    if (!is_array($value) && strpos($value, '-') !== false) {
+                        $price = explode('-', $value);
+                        if (count($price) === 2 && is_numeric($price[0])) {
+                            $value = [
+                                'min' => $price[0],
+                                'max' => $price[1]
+                            ];
+                        }
+                    }
+
+
+                    $properties['where'][$param] = $value;
+                    $properties['filters'][$param] = $value;
+
                 }
             }
         }
 
-        return $result;
+        return $properties;
     }
 
     public function getCurrentUrl(): string
@@ -224,7 +257,7 @@ class FastPaginate
     {
         $scriptProperties = $this->prepareScriptProperties($scriptProperties);
         $properties = [...$this->defaultProperties(), ...$scriptProperties];
-        $this->properties = [...$properties, ...$this->getPageProperties($properties)];
+        $this->properties = $this->getPageProperties($properties);
 
         if ($this->properties['page'] > 1) {
             $this->properties['offset'] = ($this->properties['page'] - 1) * $this->properties['limit'];
@@ -245,12 +278,18 @@ class FastPaginate
             'page' => (int)$this->properties['page'],
             'url_mode' =>  $this->properties['url_mode'],
             'path_separator' =>  $this->properties['path_separator'],
+            'path_page_name' =>  $this->properties['path_page_name'],
             'path_page' =>  $this->properties['path_page'],
+            'path_sort_name' =>  $this->properties['path_sort_name'],
             'path_sort' =>  $this->properties['path_sort'],
             'sortby' => $this->properties['sortby'],
             'sortdir' => $this->properties['sortdir'],
             'last_key' => (int)$this->properties['last_key'],
             'total' => (int)$this->properties['total'],
+            'show' => $this->properties['total'] > $this->properties['limit']
+                ? $this->properties['limit']
+                : $this->properties['total'],
+            'filters' => $this->properties['filters'] ?? [],
             'key' => $key,
         ]);
 

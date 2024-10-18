@@ -30,22 +30,10 @@ trait HandleRequest
             ]
         );
 
-        if (!empty($request['filters'] ?? null)) {
-            $filters = array_filter($request['filters'], function($value) {
-                return is_array($value) || strlen($value);
-            });
-            foreach ($filters as $name => $value) {
-                if (is_array($value)) {
-                    if (isset($value['min']) && isset($value['max'])) {
-                        $this->properties['where']["{$name}:BETWEEN"] = $value;
-                    } else {
-                        $this->properties['where']["{$name}:IN"] = $value;
-                    }
-                } else {
-                    $this->properties['where'][$name] = $value;
-                }
-            }
-        }
+        $this->properties['where'] = array_merge(
+            $this->properties['where'],
+            $request['filters'] ?? [],
+        );
 
         $this->initProperties();
         if ($action === 'filters') {

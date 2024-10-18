@@ -75,6 +75,19 @@ class Query
     {
         $where = [];
         foreach ($filters as $field => $value) {
+
+            if (empty($value)) {
+                continue;
+            }
+
+            if (is_array($value)) {
+                if (isset($value['min']) && isset($value['max'])) {
+                    $field = "{$field}:BETWEEN";
+                } else {
+                    $field = "{$field}:IN";
+                }
+            }
+
             if (strpos($field, ':') !== false) {
                 list($fieldName, $operator) = explode(':', $field, 2);
 
