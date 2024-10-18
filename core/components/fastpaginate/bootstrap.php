@@ -4,7 +4,5 @@
 require_once MODX_CORE_PATH . 'components/fastpaginate/vendor/autoload.php';
 
 $modx->services['fastpaginate'] = $modx->services->factory(function($c) use ($modx) {
-    return function(array $config = []) use ($modx) {
-        return new Boshnik\FastPaginate\FastPaginate($modx, $config);
-    };
+    return new Boshnik\FastPaginate\FastPaginate($modx);
 });

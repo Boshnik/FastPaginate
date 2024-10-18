@@ -27,7 +27,7 @@ class OnPageNotFound extends Event
             $this->modx->sendRedirect($this->modx->makeUrl($resourceId));
         }
 
-        $params = $this->fastpaginate->getPageProperties();
+        $params = $this->fastpaginate->getPageProperties($properties);
         $parts = [];
         if (isset($params['page'])) {
             $parts[] = str_replace('{page}', $params['page'], $properties['path_page']);

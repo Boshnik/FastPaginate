@@ -118,7 +118,14 @@ class FastPaginate {
             const keys = key.match(/[^\[\]]+/g);
             keys.reduce((acc, cur, i) => {
                 if (i === keys.length - 1) {
-                    acc[cur] = value;
+                    if (key.endsWith('[]')) {
+                        acc[cur] = acc[cur] || [];
+                        acc[cur].push(value);
+                    } else if (Array.isArray(acc[cur])) {
+                        acc[cur].push(value);
+                    } else {
+                        acc[cur] = value;
+                    }
                 } else {
                     acc[cur] = acc[cur] || {};
                 }

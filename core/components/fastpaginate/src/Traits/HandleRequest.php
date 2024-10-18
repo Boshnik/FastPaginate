@@ -47,12 +47,10 @@ trait HandleRequest
             }
         }
 
-        $this->query = new \Boshnik\FastPaginate\Query($this->modx, $this->properties);
-
+        $this->initProperties();
         if ($action === 'filters') {
-            $this->properties['total'] = $this->query->getTotal($this->properties['where'] ?: []);
+            $this->setTotal();
         }
-
         $total = $this->properties['total'] ?? 0;
         $limit = $this->properties['limit'] ?? 0;
 

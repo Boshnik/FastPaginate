@@ -26,12 +26,10 @@ if (empty($data['key'])) {
 
 /** @var FastPaginate $fastpaginate */
 if ($modx->services instanceof MODX\Revolution\Services\Container) {
-    $service = $modx->services->get('fastpaginate');
-    $fastpaginate = $service();
+    $fastpaginate = $modx->services->get('fastpaginate');
 } else {
     $fastpaginate = $modx->getService('fastpaginate', 'FastPaginate', MODX_CORE_PATH . 'components/fastpaginate/model/');
 }
-
 $response = $fastpaginate->handleRequest($data['action'], $data);
 
 echo json_encode($response ?? [],1);

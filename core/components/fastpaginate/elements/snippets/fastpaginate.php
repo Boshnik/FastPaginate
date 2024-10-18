@@ -4,16 +4,18 @@
 
 /** @var FastPaginate $fastpaginate */
 if ($modx->services instanceof MODX\Revolution\Services\Container) {
-    $service = $modx->services->get('fastpaginate');
-    $fastpaginate = $service($scriptProperties);
+    $fastpaginate = $modx->services->get('fastpaginate');
 } else {
-    $fastpaginate = $modx->getService('fastpaginate', 'FastPaginate', MODX_CORE_PATH . 'components/fastpaginate/model/', (array)$scriptProperties);
+    $fastpaginate = $modx->getService('fastpaginate', 'FastPaginate', MODX_CORE_PATH . 'components/fastpaginate/model/');
+}
+if (!$fastpaginate) {
+    return 'Could not load FastPaginate class!';
 }
 
 $chunk = $modx->getOption('tpl', $scriptProperties, '', true);
 $toPlaceholder = $modx->getOption('toPlaceholder', $scriptProperties, '', true);
 
-$fastpaginate->init();
+$fastpaginate->init($scriptProperties);
 
 $output = '';
 if (empty($chunk)) {

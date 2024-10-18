@@ -10,10 +10,9 @@ abstract class Event
     public function __construct(protected \modX $modx, protected array $scriptProperties = [])
     {
         if ($this->modx->services instanceof \MODX\Revolution\Services\Container) {
-            $service = $this->modx->services->get('fastpaginate');
-            $this->fastpaginate = $service($scriptProperties);
+            $this->fastpaginate = $this->modx->services->get('fastpaginate');
         } else {
-            $this->fastpaginate = $this->modx->getService('fastpaginate', 'FastPaginate', MODX_CORE_PATH . 'components/fastpaginate/model/', $scriptProperties);
+            $this->fastpaginate = $this->modx->getService('fastpaginate', 'FastPaginate', MODX_CORE_PATH . 'components/fastpaginate/model/');
         }
     }
 

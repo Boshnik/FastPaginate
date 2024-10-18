@@ -19,29 +19,19 @@ class FastPaginate
     public Response $response;
     public Parser $parser;
 
-    function __construct(public \modX $modx, public array $scriptProperties = [])
+    function __construct(public \modX $modx, array $properties = [])
     {
         $assetsUrl = MODX_ASSETS_URL . "components/{$this->namespace}/";
         $corePath = MODX_CORE_PATH . "components/{$this->namespace}/";
 
-        $this->config = [
+        $this->config = array_merge([
             'assetsUrl' => $assetsUrl,
             'actionUrl' => $assetsUrl . 'action.php',
             'modelPath' => $corePath . 'model/',
             'siteUrl' => MODX_SITE_URL,
-        ];
+        ], $properties);
 
-        $this->prepareScriptProperties();
-        $this->properties = [...$this->defaultProperties(), ...$this->scriptProperties];
-        $this->properties = [...$this->properties, ...$this->getPageProperties()];
-
-        $this->response = new Response();
         $this->crypt = new Crypt($this->modx->uuid);
-        $this->parser = new Parser($this->modx, $this->properties);
-
-        if ($this->properties['page'] > 1) {
-            $this->properties['offset'] = ($this->properties['page'] - 1) * $this->properties['limit'];
-        }
 
         $this->modx->addPackage($this->namespace, $this->config['modelPath']);
         $this->modx->lexicon->load("{$this->namespace}:default");
@@ -93,33 +83,35 @@ class FastPaginate
         return $this->modx->getOption("{$this->namespace}_{$name}", $this->properties, '', 1);
     }
 
-    public function prepareScriptProperties(): void
+    public function prepareScriptProperties(array $scriptProperties = []): array
     {
-        if (empty($this->scriptProperties['where'] ?? '')) {
-            $this->scriptProperties['where'] = [];
+        if (empty($scriptProperties['where'] ?? '')) {
+            $scriptProperties['where'] = [];
         }
 
-        if (is_string($this->scriptProperties['where'])) {
-            $this->scriptProperties['where'] = json_decode($this->scriptProperties['where'], true);
+        if (is_string($scriptProperties['where'])) {
+            $scriptProperties['where'] = json_decode($scriptProperties['where'], true);
             if (json_last_error() !== JSON_ERROR_NONE) {
                 $this->modx->log(1, 'Error when decoding filters.');
-                $this->scriptProperties['where'] = [];
+                $scriptProperties['where'] = [];
             }
         }
+
+        return $scriptProperties;
     }
 
-    public function getPageProperties(): array
+    public function getPageProperties(array $properties = []): array
     {
         $result = [];
         $currentUrl = $this->getCurrentUrl();
         $url_parts = parse_url($currentUrl);
-        $separator = $this->properties['path_separator'];
+        $separator = $properties['path_separator'];
         $templates = [
-            'page' => $this->properties['path_page'],
-            'sort' => $this->properties['path_sort'],
+            'page' => $properties['path_page'],
+            'sort' => $properties['path_sort'],
         ];
 
-        if ($this->properties['url_mode'] === 'url') {
+        if ($properties['url_mode'] === 'url') {
             $path = $url_parts['path'];
             $query = $url_parts['query'] ?? '';
             $full_path = trim($path, '/') . ($query ? "?" . $query : '');
@@ -216,13 +208,33 @@ class FastPaginate
         $this->modx->regClientScript($this->config['assetsUrl'] . $this->namespace . '.js');
     }
 
-    public function init()
+    public function initProperties(): void
     {
+        $this->response = new Response();
+        $this->parser = new Parser($this->modx, $this->properties);
         $this->query = new Query($this->modx, $this->properties);
+    }
+
+    public function setTotal(): void
+    {
         $this->properties['total'] = $this->query->getTotal($this->properties['where'] ?: []);
+    }
+
+    public function init(array $scriptProperties = [])
+    {
+        $scriptProperties = $this->prepareScriptProperties($scriptProperties);
+        $properties = [...$this->defaultProperties(), ...$scriptProperties];
+        $this->properties = [...$properties, ...$this->getPageProperties($properties)];
+
+        if ($this->properties['page'] > 1) {
+            $this->properties['offset'] = ($this->properties['page'] - 1) * $this->properties['limit'];
+        }
+
+        $this->initProperties();
+        $this->setTotal();
         $this->filters();
 
-        $key = $this->crypt->encrypt($this->scriptProperties);
+        $key = $this->crypt->encrypt($scriptProperties);
         if (is_array($key)) {
             return false;
         }
