@@ -77,24 +77,21 @@ class Query
         foreach ($filters as $field => $value) {
             if (strpos($field, ':') !== false) {
                 list($fieldName, $operator) = explode(':', $field, 2);
+
+                $this->modx->invokeEvent('fpOnFieldFilter', [
+                    'name' => $fieldName,
+                    'operator' => &$operator,
+                    'value' => &$value,
+                ]);
+
                 switch ($operator) {
                     case '>':
-                        $where[] = "`$fieldName` > " . $this->modx->quote($value);
-                        break;
                     case '<':
-                        $where[] = "`$fieldName` < " . $this->modx->quote($value);
-                        break;
                     case '>=':
-                        $where[] = "`$fieldName` >= " . $this->modx->quote($value);
-                        break;
                     case '<=':
-                        $where[] = "`$fieldName` <= " . $this->modx->quote($value);
-                        break;
                     case '!=':
-                        $where[] = "`$fieldName` != " . $this->modx->quote($value);
-                        break;
                     case '=':
-                        $where[] = "`$fieldName` = " . $this->modx->quote($value);
+                        $where[] = "`$fieldName` $operator " . $this->modx->quote($value);
                         break;
                     case 'LIKE':
                         if (is_array($value)) {
@@ -137,9 +134,36 @@ class Query
                             $where[] = "`$fieldName` BETWEEN $min AND $max";
                         }
                         break;
+                    case 'FIND_IN_SET':
+                        if (is_array($value)) {
+                            $jsonConditions = array_map(function ($val) use ($fieldName) {
+                                return "FIND_IN_SET('{$val}', `$fieldName`) > 0";
+                            }, $value);
+                            $where[] = '(' . implode(' OR ', $jsonConditions) . ')';
+                        } else {
+                            $where[] = "FIND_IN_SET('{$value}', `$fieldName`) > 0";
+                        }
+                        break;
+                    case 'FIND_NOT_IN_SET':
+                        if (is_array($value)) {
+                            $jsonConditions = array_map(function ($val) use ($fieldName) {
+                                return "FIND_IN_SET('{$val}', `$fieldName`) = 0";
+                            }, $value);
+                            $where[] = '(' . implode(' AND ', $jsonConditions) . ')';
+                        } else {
+                            $where[] = "FIND_IN_SET('{$value}', `$fieldName`) = 0";
+                        }
+                        break;
                 }
             } else {
-                $where[] = "`$field` = " . $this->modx->quote($value);
+                $operator = '=';
+                $this->modx->invokeEvent('fpOnFieldFilter', [
+                    'name' => $field,
+                    'operator' => &$operator,
+                    'value' => &$value,
+                ]);
+
+                $where[] = "`$field` $operator " . $this->modx->quote($value);
             }
         }
 
