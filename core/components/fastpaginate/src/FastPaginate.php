@@ -53,20 +53,19 @@ class FastPaginate
             'sortdir' => 'asc',
             'page' => 1,
             'last_key' => 0,
-            'next_link' => '',
-            'tpl_pagination' => '',
-
+            'templates' => [
+                'loadmore' => '',
+                'pagination' => '',
+            ],
             'action' => '',
             'wrapper' => "#{$this->namespace}",
             'outputSeparator' => "\n",
             'tpl' => '',
 
-            'url_mode' => $this->getOption('url_mode'),
-            'path_separator' => $this->getOption('path_separator'),
-            'path_page_name' => $this->getOption('path_page_name'),
-            'path_page' => $this->getOption('path_page'),
-            'path_sort_name' => $this->getOption('path_sort_name'),
-            'path_sort' => $this->getOption('path_sort'),
+            'url_mode' => $this->getOption('url_mode', 'get'),
+            'path_separator' => $this->getOption('path_separator', ';'),
+            'page_name' => $this->getOption('page_name', 'page'),
+            'sort_name' => $this->getOption('sort_name', 'sort'),
 
             'show.loadmore' => 0,
             'pls.loadmore' => 'pls.loadmore',
@@ -83,9 +82,9 @@ class FastPaginate
         ];
     }
 
-    public function getOption($name): string
+    public function getOption($name, $default = ''): string
     {
-        return $this->modx->getOption("{$this->namespace}_{$name}", $this->properties, '', 1);
+        return $this->modx->getOption("{$this->namespace}_{$name}", $this->properties, $default, 1);
     }
 
     public function prepareScriptProperties(array $scriptProperties = []): array
@@ -111,60 +110,41 @@ class FastPaginate
         $url_parts = parse_url($currentUrl);
 
         if ($properties['url_mode'] === 'url') {
-            $separator = $properties['path_separator'];
-            $templates = [
-                'page' => $properties['path_page'],
-                'sort' => $properties['path_sort'],
-            ];
             $path = $url_parts['path'];
             $query = $url_parts['query'] ?? '';
             $full_path = trim($path, '/') . ($query ? "?" . $query : '');
-
-            foreach ($templates as $key => $template) {
-                $regex = preg_replace_callback('/\{([a-z]+)\}/', function ($matches) use ($separator) {
-                    return '(?P<' . $matches[1] . '>[^' . $separator . '/?]+)';
-                }, $template);
-
-                if (preg_match('#' . $regex . '#', $full_path, $matches)) {
-                    foreach ($matches as $k => $v) {
-                        if (!is_int($k)) {
-                            $result[$k] = $v;
-                        }
-                    }
-                }
-            }
-
+            $full_path = str_replace($properties['path_separator'], '&', $full_path);
         } else {
             $path = $url_parts['query'] ?? '';
             $full_path = trim($path, '/');
-            parse_str($full_path, $params);
-            foreach ($params as $param => $value) {
-                if ($param === 'sort') {
-                    [$sortby, $sortdir] = explode('-', $value);
-                    $properties['sortby'] = $sortby;
-                    $properties['sortdir'] = $sortdir;
-                } else if ($param === 'page') {
-                    $properties['page'] = $value;
-                } else {
-                    if (strpos($value, ',') !== false) {
-                        $value = explode(',', $value);
-                    }
+        }
+        $full_path = str_replace('?', '', $full_path);
+        parse_str($full_path, $params);
 
-                    if (!is_array($value) && strpos($value, '-') !== false) {
-                        $price = explode('-', $value);
-                        if (count($price) === 2 && is_numeric($price[0])) {
-                            $value = [
-                                'min' => $price[0],
-                                'max' => $price[1]
-                            ];
-                        }
-                    }
-
-
-                    $properties['where'][$param] = $value;
-                    $properties['filters'][$param] = $value;
-
+        foreach ($params as $param => $value) {
+            if ($param === $properties['sort_name']) {
+                [$sortby, $sortdir] = explode('-', $value);
+                $properties['sortby'] = $sortby;
+                $properties['sortdir'] = $sortdir;
+            } else if ($param === $properties['page_name']) {
+                $properties['page'] = $value;
+            } else {
+                if (strpos($value, ',') !== false) {
+                    $value = explode(',', $value);
                 }
+
+                if (!is_array($value) && strpos($value, '-') !== false) {
+                    $price = explode('-', $value);
+                    if (count($price) === 2 && is_numeric($price[0])) {
+                        $value = [
+                            'min' => $price[0],
+                            'max' => $price[1]
+                        ];
+                    }
+                }
+
+                $properties['where'][$param] = $value;
+                $properties['filters'][$param] = $value;
             }
         }
 
@@ -278,10 +258,8 @@ class FastPaginate
             'page' => (int)$this->properties['page'],
             'url_mode' =>  $this->properties['url_mode'],
             'path_separator' =>  $this->properties['path_separator'],
-            'path_page_name' =>  $this->properties['path_page_name'],
-            'path_page' =>  $this->properties['path_page'],
-            'path_sort_name' =>  $this->properties['path_sort_name'],
-            'path_sort' =>  $this->properties['path_sort'],
+            'page_name' =>  $this->properties['page_name'],
+            'sort_name' =>  $this->properties['sort_name'],
             'sortby' => $this->properties['sortby'],
             'sortdir' => $this->properties['sortdir'],
             'last_key' => (int)$this->properties['last_key'],
@@ -313,11 +291,11 @@ class FastPaginate
         $this->parser->setPlaceholder('total', $total);
 
         if (($showLoadMore || $showPagination) && $total > $limit) {
-            $mode = $this->properties['url_mode'] === 'get' ? '?' : '/';
+            $mode = $this->properties['url_mode'] === 'url' ? '/' : '?';
             $pagination = new Pagination(
                 $this->properties['page'] ?? 1,
                 $total ? ceil($total / $limit) : 0,
-                $mode . $this->properties['path_page']
+                "{$mode}{$this->properties['page_name']}={page}"
             );
 
             if ($showLoadMore) {

@@ -1,1 +1,1 @@
-<a href="[[+href]]" class="fp-loadmore[[+classes]]"[[+href:is=`#`:then=` style="display:none"`]]>[[%fp.btn.loadmore]]</a>
+<a href="[[+href]]" class="loadmore-link[[+classes]]"[[+href:is=`#`:then=` style="display:none"`]]>[[%fp.btn.loadmore]]</a>

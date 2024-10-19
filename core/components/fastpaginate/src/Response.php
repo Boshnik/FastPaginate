@@ -13,8 +13,7 @@ class Response
         'sortdir',
         'page',
         'last_key',
-        'next_link',
-        'tpl_pagination',
+        'templates',
         'data',
         'output'
     ];

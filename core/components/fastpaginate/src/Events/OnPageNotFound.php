@@ -14,38 +14,18 @@ class OnPageNotFound extends Event
             return false;
         }
 
-        $properties = [
-            'url_mode' => $this->fastpaginate->getOption('url_mode'),
-            'path_separator' => $this->fastpaginate->getOption('path_separator'),
-            'path_page' => $this->fastpaginate->getOption('path_page'),
-            'path_sort' => $this->fastpaginate->getOption('path_sort'),
-        ];
-
-        $resourceId = $this->modx->getOption('site_start', null, 1, 1);
-
+        $properties = $this->fastpaginate->defaultProperties();
         if ($properties['url_mode'] !== 'url') {
-            $this->modx->sendRedirect($this->modx->makeUrl($resourceId));
+            return false;
         }
 
-        $params = $this->fastpaginate->getPageProperties($properties);
-        $parts = [];
-        if (isset($params['page'])) {
-            $parts[] = str_replace('{page}', $params['page'], $properties['path_page']);
-        }
-
-        if (isset($params['sortby']) && isset($params['sortdir'])) {
-            $parts[] = str_replace(['{sortby}', '{sortdir}'], [$params['sortby'], $params['sortdir']], $properties['path_sort']);
-        }
-
-        $path = implode($properties['path_separator'], $parts);
         $currentUrl = $this->fastpaginate->getCurrentUrl();
         $url_parts = parse_url($currentUrl);
-        $path = str_replace($path, '', $url_parts['path']);
-        $path = trim($path, '/');
-        $aliases = explode('/', $path);
-        $alias = end($aliases);
+        $aliases = explode('/', $url_parts['path']);
+        $alias = $aliases[count($aliases)-3] ?? null;
 
         if (empty($alias)) {
+            $resourceId = $this->modx->getOption('site_start', null, 1, 1);
             $this->modx->resource = $this->modx->getObject(\modResource::class, $resourceId);
         } else {
             $this->modx->resource = $this->modx->getObject(\modResource::class, ['alias' => $alias]);
@@ -55,6 +35,7 @@ class OnPageNotFound extends Event
             $this->fastpaginate->loadScripts();
             $this->modx->request->prepareResponse();
         } else {
+            $resourceId = $this->modx->getOption('site_start', null, 1, 1);
             $this->modx->sendRedirect($this->modx->makeUrl($resourceId));
         }
     }

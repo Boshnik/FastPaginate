@@ -42,19 +42,19 @@ trait HandleRequest
         $total = $this->properties['total'] ?? 0;
         $limit = $this->properties['limit'] ?? 0;
 
-        $mode = $this->properties['path_page'] === 'get' ? '?' : '/';
+        $mode = $this->properties['url_mode'] === 'url' ? '/' : '?';
         $pagination = new \Boshnik\FastPaginate\Pagination(
             $request['load_page'] ?? 1,
             $total ? ceil($total / $limit) : 0,
-            $mode . $this->properties['path_page']
+            "{$mode}{$this->properties['page_name']}={page}"
         );
 
-        if ($this->properties['show.loadmore'] ?? false) {
-            $this->properties['next_link'] = $pagination->nextLink();
+        if (($this->properties['show.loadmore'] ?? false) && $total > $limit) {
+            $this->properties['templates']['loadmore'] = $this->getTplLoadMore($pagination);
         }
 
         if (($this->properties['show.pagination'] ?? false) && $total > $limit) {
-            $this->properties['tpl_pagination'] = $this->getTplPagination($pagination);
+            $this->properties['templates']['pagination'] = $this->getTplPagination($pagination);
         }
     }
 
