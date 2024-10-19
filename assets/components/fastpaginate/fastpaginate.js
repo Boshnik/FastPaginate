@@ -37,6 +37,10 @@ class FastPaginate {
             filters: config.filters || {},
         };
 
+        this.class = {
+            loading: 'fp-loading',
+        };
+
         this.addEventListeners();
         this.updateLayout();
         this.URLManager = new URLManager(this.path.separator);
@@ -222,6 +226,7 @@ class FastPaginate {
     }
 
     async fetch(action, fields = {}) {
+        this.wrapper.classList.add(this.class.loading);
         const data = {
             action: action,
             key: this.key,
@@ -251,20 +256,22 @@ class FastPaginate {
 
     async response(response) {
         console.log('response', response);
-        if (response?.action === 'loadmore') {
-            this.el.items.insertAdjacentHTML('beforeend', response.output);
-        } else {
-            this.el.items.innerHTML = response.output;
-        }
 
         this.state.current_page = response.page || 1;
         this.state.last_key = response?.last_key || '';
         this.state.total = response.total || 0;
         this.state.show = response.show || 0;
 
+        if (response?.action === 'loadmore') {
+            this.el.items.insertAdjacentHTML('beforeend', response.output);
+        } else {
+            this.el.items.innerHTML = response.output;
+        }
         this.updatePagination(response);
         this.updateVariables();
         this.updateURL();
+
+        this.wrapper.classList.remove(this.class.loading);
     }
 
 
