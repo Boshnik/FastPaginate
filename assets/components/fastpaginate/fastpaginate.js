@@ -94,6 +94,10 @@ class FastPaginate {
                 event.preventDefault();
                 this.filtersForm();
             });
+
+            this.el.formFilters.addEventListener('reset', event => {
+                this.resetForm();
+            });
         }
     }
 
@@ -149,6 +153,20 @@ class FastPaginate {
         const data = new FormData(this.el.formFilters);
         const jsonData = this.formDataToObject(data);
         const response = await this.fetch('filters', {filters: jsonData});
+        await this.response(response);
+    }
+
+    async resetForm() {
+        this.state.last_key = 0;
+        this.state.current_page = 0;
+        this.state.load_page = 1;
+        let items = this.el.formFilters.querySelectorAll("[name]");
+        items.forEach(item => {
+            this.URLManager.delete(item.name.replace(/\[\]|\[min\]|\[max\]/g, ''));
+        });
+        this.URLManager.delete('page');
+        this.URLManager.delete('sort');
+        const response = await this.fetch('filters', {filters: {}});
         await this.response(response);
     }
 
