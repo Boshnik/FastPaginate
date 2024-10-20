@@ -1,6 +1,6 @@
 class FastPaginate {
     constructor(config) {
-        console.log('config', config);
+        // console.log('Config', config);
         this.url = config.actionUrl;
         this.key = config.key;
         this.wrapper = document.querySelector(config.wrapper);
@@ -12,6 +12,7 @@ class FastPaginate {
             items: this.wrapper.querySelector('.fp-items'),
             sort: this.wrapper.querySelector('.fp-sort'),
             formFilters: this.wrapper.querySelector('.fp-filters'),
+            filterInputs: this.wrapper.querySelectorAll('.fp-filters input,select'),
             filterChange: this.wrapper.querySelector('.fp-filters.fp-filters-change'),
             loadMore: this.wrapper.querySelector('.fp-loadmore'),
             pagination: this.wrapper.querySelector('.fp-pagination'),
@@ -34,7 +35,7 @@ class FastPaginate {
                 sortby: config.sortby || 'id',
                 sortdir: config.sortdir || 'asc',
             },
-            filters: config.filters || {},
+            filters: Object.keys(config.filters).length > 0 ? config.filters : {},
         };
 
         this.class = {
@@ -83,9 +84,13 @@ class FastPaginate {
 
         if (this.el.formFilters) {
             if (this.el.filterChange) {
+
                 this.el.formFilters.addEventListener('change', async event => {
                     event.preventDefault();
                     let target = event.target;
+                    if (this.el.filterInputs?.length) {
+                        this.el.filterInputs.forEach(item => item.disabled = true);
+                    }
                     if (target.name.includes('[min]') || target.name.includes('[max]')) {
                         let name = target.name.replace('[min]', '').replace('[max]', '');
                         let inputMin = this.el.formFilters.querySelector(`[name="${name}[min]"]`);
@@ -98,14 +103,16 @@ class FastPaginate {
                         }
                     } else if (target.name.includes('[]')) {
                         let name = target.name.replace('[]', '');
-                        if (!(name in this.state.filters)) {
-                            this.state.filters[name] = [];
+                        let filterValues = this.state.filters[name] || [];
+                        let filterSet = new Set(Array.isArray(filterValues) ? filterValues : filterValues.split(','));
+
+                        if (target.checked) {
+                            filterSet.add(target.value);
+                        } else {
+                            filterSet.delete(target.value);
                         }
 
-                        this.state.filters[name] = target.checked
-                            ? [...new Set([...this.state.filters[name], target.value])]
-                            : this.state.filters[name].filter(value => value !== target.value);
-
+                        this.state.filters[name] = Array.from(filterSet).sort();
                     } else {
                         if (target.value === '' && target.name in this.state.filters) {
                             delete this.state.filters[target.name];
@@ -161,6 +168,9 @@ class FastPaginate {
                                 }
                                 break;
                             case 'checkbox':
+                                if (typeof value === 'string') {
+                                    value = [value];
+                                }
                                 value.forEach(val => {
                                     let item = this.el.formFilters.querySelector(`[name="${name}[]"][value="${val}"]`);
                                     if (item) {
@@ -226,8 +236,9 @@ class FastPaginate {
     }
 
     async fetch(action, fields = {}) {
+        this.updateURL();
         this.wrapper.classList.add(this.class.loading);
-        const data = {
+        let data = {
             action: action,
             key: this.key,
             total: this.state.total,
@@ -239,6 +250,7 @@ class FastPaginate {
             filters: this.state.filters,
             ...fields
         };
+        // console.log(JSON.stringify(data, null, 2));
 
         const response = await fetch(this.url, {
             method: 'POST',
@@ -255,7 +267,11 @@ class FastPaginate {
     }
 
     async response(response) {
-        console.log('response', response);
+        // console.log('Response', response);
+        this.wrapper.classList.remove(this.class.loading);
+        if (this.el.filterInputs?.length) {
+            this.el.filterInputs.forEach(item => item.disabled = false);
+        }
 
         this.state.current_page = response.page || 1;
         this.state.last_key = response?.last_key || '';
@@ -263,15 +279,12 @@ class FastPaginate {
         this.state.show = response.show || 0;
 
         if (response?.action === 'loadmore') {
-            this.el.items.insertAdjacentHTML('beforeend', response.output);
+            this.el.items.insertAdjacentHTML('beforeend', response.output || '');
         } else {
-            this.el.items.innerHTML = response.output;
+            this.el.items.innerHTML = response.output || '';
         }
         this.updatePagination(response);
         this.updateVariables();
-        this.updateURL();
-
-        this.wrapper.classList.remove(this.class.loading);
     }
 
 
@@ -355,7 +368,7 @@ class FastPaginate {
                         break;
                     case 'filters':
                         Object.entries(this.state.filters).forEach(([name, value]) => {
-                            if (typeof value === 'array') {
+                            if (Array.isArray(value)) {
                                 value = value.join(',');
                             } else if (typeof value === 'object') {
                                 let prepareValue = [];
