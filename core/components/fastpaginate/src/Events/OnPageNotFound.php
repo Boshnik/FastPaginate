@@ -6,6 +6,7 @@ class OnPageNotFound extends Event
 {
     public function run()
     {
+
         if ($this->modx->context->key === 'mgr') {
             return false;
         }

@@ -2,9 +2,6 @@
 
 namespace Boshnik\FastPaginate;
 
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
-
 use Boshnik\FastPaginate\Traits\Output;
 use Boshnik\FastPaginate\Traits\HandleRequest;
 
@@ -18,6 +15,7 @@ class FastPaginate
     public array $config = [];
     public array $properties = [];
     public Query $query;
+    public Cache $cache;
     public Crypt $crypt;
     public Response $response;
     public Parser $parser;
@@ -34,6 +32,9 @@ class FastPaginate
             'siteUrl' => MODX_SITE_URL,
         ], $properties);
 
+        $this->cache = new Cache($this->modx, [
+            \xPDO::OPT_CACHE_KEY => $this->namespace,
+        ], $this->getOption('cache_time', 3600));
         $this->crypt = new Crypt($this->modx->uuid);
 
         $this->modx->addPackage($this->namespace, $this->config['modelPath']);
@@ -66,6 +67,8 @@ class FastPaginate
             'path_separator' => $this->getOption('path_separator', ';'),
             'page_name' => $this->getOption('page_name', 'page'),
             'sort_name' => $this->getOption('sort_name', 'sort'),
+            'cache' => $this->getOption('cache', false),
+            'cacheTime' => $this->getOption('cache_time', 3600),
 
             'show.loadmore' => 0,
             'pls.loadmore' => 'pls.loadmore',
@@ -160,10 +163,49 @@ class FastPaginate
 
     public function filters(array $where = []): static
     {
-        $this->properties['data'] = $this->query->getData($where ?: $this->properties['where']);
+        if ($this->properties['cache']) {
+            $cacheParams = [
+                ...$where ?: $this->properties['where'],
+                ...array_intersect_key($this->properties, array_flip([
+                    'className', 'fields', 'limit', 'offset', 'sortby', 'sortdir', 'last_key'
+                ]))
+            ];
+            $cacheKey = $this->getCacheKey('getData', $cacheParams);
+            $cachedData = $this->cache->get($cacheKey);
+            if ($cachedData) {
+                $this->properties['data'] = $cachedData;
+            } else {
+                $this->properties['data'] = $this->query->getData($where ?: $this->properties['where']);
+                $this->cache->set($cacheKey, $this->properties['data'], $this->properties['cacheTime']);
+            }
+        } else {
+            $this->properties['data'] = $this->query->getData($where ?: $this->properties['where']);
+        }
+
         $this->properties['last_key'] = end($this->properties['data'])[$this->properties['sortby']] ?? null;
 
         return $this;
+    }
+
+    public function setTotal(array $where = []): void
+    {
+        if ($this->properties['cache']) {
+            $cacheKey = $this->getCacheKey('getTotal', $where ?: $this->properties['where']);
+            $cachedTotal = $this->cache->get($cacheKey);
+            if ($cachedTotal) {
+                $this->properties['total'] = $cachedTotal;
+            } else {
+                $this->properties['total'] = $this->query->getTotal($where ?: $this->properties['where']);
+                $this->cache->set($cacheKey, $this->properties['total'], $this->properties['cacheTime']);
+            }
+        } else {
+            $this->properties['total'] = $this->query->getTotal($where ?: $this->properties['where']);
+        }
+    }
+
+    public function getCacheKey(string $name, array $params = []): string
+    {
+        return "{$this->namespace}/{$name}/" . md5(json_encode($params));
     }
 
     public function nextPage(): array
@@ -226,11 +268,6 @@ class FastPaginate
         $this->response = new Response();
         $this->parser = new Parser($this->modx, $this->properties);
         $this->query = new Query($this->modx, $this->properties);
-    }
-
-    public function setTotal(): void
-    {
-        $this->properties['total'] = $this->query->getTotal($this->properties['where'] ?: []);
     }
 
     public function init(array $scriptProperties = [])
