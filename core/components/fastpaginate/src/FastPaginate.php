@@ -258,9 +258,9 @@ class FastPaginate
         return $this->response->success('', $this->properties);
     }
 
-    public function loadScripts(): void
+    public function loadScripts(string $hash = ''): void
     {
-        $this->modx->regClientScript($this->config['assetsUrl'] . $this->namespace . '.js');
+        $this->modx->regClientScript("{$this->config['assetsUrl']}{$this->namespace}{$hash}.js");
     }
 
     public function initProperties(): void
