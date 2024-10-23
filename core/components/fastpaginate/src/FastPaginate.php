@@ -23,12 +23,10 @@ class FastPaginate
     function __construct(public \modX $modx, array $properties = [])
     {
         $assetsUrl = MODX_ASSETS_URL . "components/{$this->namespace}/";
-        $corePath = MODX_CORE_PATH . "components/{$this->namespace}/";
 
         $this->config = array_merge([
             'assetsUrl' => $assetsUrl,
             'actionUrl' => $assetsUrl . 'action.php',
-            'modelPath' => $corePath . 'model/',
             'siteUrl' => MODX_SITE_URL,
         ], $properties);
 
@@ -37,7 +35,6 @@ class FastPaginate
         ], $this->getOption('cache_time', 3600));
         $this->crypt = new Crypt($this->modx->uuid);
 
-        $this->modx->addPackage($this->namespace, $this->config['modelPath']);
         $this->modx->lexicon->load("{$this->namespace}:default");
     }
 
