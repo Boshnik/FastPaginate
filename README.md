@@ -1,5 +1,5 @@
 # FastPaginate
-Filter and sort data faster than ever!
+Fast pagination with filtering and sorting capabilities for MODX.
 
 - **Version:** 1.0.0-pl
 - **Support MODX:** 2 / 3
